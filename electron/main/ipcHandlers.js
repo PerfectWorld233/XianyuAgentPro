@@ -1,5 +1,5 @@
 const { getConfig, saveConfig, getPrompts, savePrompts } = require('./dbManager')
-const { sendCommand, startPython } = require('./pythonManager')
+const { sendCommand } = require('./pythonManager')
 
 function registerIpcHandlers(ipcMain, mainWindow) {
   // Bot control
@@ -40,9 +40,6 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     sendCommand({ cmd: 'reload_config' })
     return { ok: true }
   })
-
-  // Ensure Python process is running when app starts
-  startPython()
 }
 
 module.exports = { registerIpcHandlers }

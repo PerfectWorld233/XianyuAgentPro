@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, nativeTheme } = require('electron')
 const path = require('path')
 
-const { initPythonManager } = require('./pythonManager')
+const { initPythonManager, startPython } = require('./pythonManager')
 const { registerIpcHandlers } = require('./ipcHandlers')
 const { initDbManager } = require('./dbManager')
 
@@ -35,10 +35,12 @@ app.whenReady().then(() => {
   app.setPath('userData', dataDir)
 
   initDbManager(dataDir)
-  initPythonManager(mainWindow)
   registerIpcHandlers(ipcMain, mainWindow)
 
   createWindow()
+
+  initPythonManager(mainWindow)
+  startPython()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
