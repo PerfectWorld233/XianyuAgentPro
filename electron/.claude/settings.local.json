@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(curl -s https://api.github.com/repos/coreybutler/nvm-windows/releases/latest)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''tag_name'''',''''?''''\\)\\); [print\\(a[''''browser_download_url'''']\\) for a in d.get\\(''''assets'''',[]\\)]\")",
+      "Bash(curl:*)",
+      "Bash(powershell -Command \"\n\\\\$ProgressPreference = 'SilentlyContinue';\n\\\\$url = 'https://github.com/coreybutler/nvm-windows/releases/download/1.2.2/nvm-setup.exe';\n\\\\$out = \\\\\"\\\\$env:TEMP\\\\\\\\nvm-setup.exe\\\\\";\ntry {\n    Invoke-WebRequest -Uri \\\\$url -OutFile \\\\$out -UseBasicParsing -TimeoutSec 60;\n    Write-Host 'Downloaded to' \\\\$out;\n    \\(Get-Item \\\\$out\\).Length\n} catch {\n    Write-Host 'Error:' \\\\$_.Exception.Message\n}\n\")",
+      "Bash(powershell -Command \"Start-Process -FilePath \\\\\"\\\\$env:TEMP\\\\\\\\nvm-setup.exe\\\\\" -Verb RunAs -Wait\")",
+      "Bash(powershell -Command \"nvm version\")",
+      "Bash(powershell -Command \"\n\\\\$nvmPath = \\\\\"\\\\$env:APPDATA\\\\\\\\nvm\\\\\";\nif \\(Test-Path \\\\\"\\\\$nvmPath\\\\\\\\nvm.exe\\\\\"\\) {\n    & \\\\\"\\\\$nvmPath\\\\\\\\nvm.exe\\\\\" version\n} else {\n    Write-Host 'nvm not found at' \\\\$nvmPath;\n    Get-ChildItem 'C:\\\\\\\\Users\\\\\\\\60273\\\\\\\\AppData\\\\\\\\Roaming\\\\\\\\nvm' -ErrorAction SilentlyContinue | Select-Object Name\n}\n\")"
+    ]
+  }
+}

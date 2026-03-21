@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(npm install:*)",
+      "Bash(nvm install:*)",
+      "Bash(npm run:*)",
+      "Bash(cp:*)",
+      "Bash(npm --version)",
+      "Bash(./node_modules/.bin/electron-rebuild -f -w better-sqlite3)",
+      "Bash(node node_modules/electron/install.js)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist:*)",
+      "Bash(cmd /c \"rename D:\\\\pythonProject\\\\github\\\\XianyuAutoAgent\\\\electron web\")",
+      "Bash(sqlite3:*)",
+      "Bash(grep -E \"\\\\.\\(py|txt|toml|yaml|yml|json\\)$\")",
+      "Bash(python -c \"import langgraph; print\\(langgraph.__version__\\)\")",
+      "Bash(pip show:*)",
+      "Bash(python:*)",
+      "Bash(pip list:*)",
+      "Bash(pip install:*)",
+      "Bash(pip index:*)",
+      "Bash(gh repo:*)",
+      "Bash(rm main.py XianyuAgent.py XianyuApis.py context_manager.py requirements.txt .env.example)",
+      "Bash(rm -rf utils/ __pycache__/)"
+    ]
+  }
+}

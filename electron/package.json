@@ -1,0 +1,32 @@
+{
+  "name": "xianyu-auto-agent",
+  "version": "1.0.0",
+  "description": "XianyuAutoAgent 桌面版 - 闲鱼 AI 客服机器人",
+  "main": "main/index.js",
+  "scripts": {
+    "dev": "concurrently \"vite --config vite.config.js\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build:renderer": "vite build --config vite.config.js",
+    "build:electron": "electron-builder --config electron-builder.yml",
+    "build": "npm run build:renderer && npm run build:electron",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "concurrently": "^8.2.0",
+    "cross-env": "^7.0.3",
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.0",
+    "electron-rebuild": "^3.2.9",
+    "vite": "^5.0.0",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.0",
+    "pinia": "^2.1.0",
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0"
+  }
+}

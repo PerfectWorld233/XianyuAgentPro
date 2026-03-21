@@ -1,0 +1,4 @@
+interface:
+  display_name: "Xianyu AutoAgent"
+  short_description: "AI 客服机器人开发助手"
+  default_prompt: "帮我优化 XianyuAutoAgent 项目 - 这是一个闲鱼自动化客服机器人系统"
