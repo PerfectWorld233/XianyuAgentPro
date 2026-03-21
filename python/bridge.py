@@ -94,6 +94,17 @@ def emit_login_status(logged_in: bool, username: str = ""):
     sys.stdout.flush()
 
 
+def emit_generate_prompts_result(success: bool, prompts: dict = None, message: str = ""):
+    payload = {
+        "type": "generate_prompts_result",
+        "success": success,
+        "prompts": prompts or {},
+        "message": message,
+    }
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
 # ---------------------------------------------------------------------------
 # Stdin reader thread (Windows asyncio stdin not reliable)
 # ---------------------------------------------------------------------------
@@ -121,6 +132,7 @@ class BridgeManager:
         self.config_manager = None
         self.bot_task: asyncio.Task = None
         self.login_task: asyncio.Task = None
+        self.generate_task: asyncio.Task = None
         self.check_login_task: asyncio.Task = None
 
     def load_modules(self):
@@ -225,6 +237,59 @@ class BridgeManager:
             logger.warning("扫码登录超时或失败，请重试")
             emit_login_result(False, "登录超时或失败，请重试")
 
+    async def handle_generate_prompts(self, chat_log: str):
+        logger.info("正在调用 AI 分析聊天记录，生成提示词…")
+        try:
+            from openai import OpenAI
+            config = self.config_manager.get_config()
+            client = OpenAI(
+                api_key=config.get("API_KEY", ""),
+                base_url=config.get("MODEL_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            )
+            model = config.get("MODEL_NAME", "qwen-max")
+
+            system_prompt = (
+                "你是一个咸鱼（闲鱼）智能客服提示词生成专家。\n"
+                "用户会提供一段买卖双方的聊天记录。\n"
+                "请根据聊天记录中卖家的回复风格、议价策略和专业知识，"
+                "为以下 4 个角色分别生成一段高质量的系统提示词（system prompt）：\n"
+                "1. classify_prompt：意图分类 Agent，判断用户消息属于 price/tech/default 哪种意图\n"
+                "2. price_prompt：价格谈判 Agent，负责礼貌但坚定地处理砍价\n"
+                "3. tech_prompt：技术咨询 Agent，负责回答商品的技术/使用问题\n"
+                "4. default_prompt：默认回复 Agent，处理其他通用咨询\n\n"
+                "输出格式必须严格为如下 JSON（不要包含任何其他文字）：\n"
+                '{"classify_prompt": "...", "price_prompt": "...", "tech_prompt": "...", "default_prompt": "..."}'
+            )
+
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"以下是聊天记录：\n\n{chat_log}"},
+                ],
+                temperature=0.5,
+                max_tokens=2000,
+            )
+
+            raw = response.choices[0].message.content.strip()
+            # Strip markdown code fences if present
+            if raw.startswith("```"):
+                raw = "\n".join(raw.splitlines()[1:])
+                if raw.endswith("```"):
+                    raw = raw[: raw.rfind("```")]
+            prompts = json.loads(raw)
+
+            required = {"classify_prompt", "price_prompt", "tech_prompt", "default_prompt"}
+            if not required.issubset(prompts.keys()):
+                raise ValueError(f"AI 返回字段缺失: {required - prompts.keys()}")
+
+            logger.info("AI 提示词生成成功")
+            emit_generate_prompts_result(True, prompts)
+
+        except Exception as e:
+            logger.error(f"AI 提示词生成失败: {e}")
+            emit_generate_prompts_result(False, message=str(e))
+
     async def handle_check_login(self):
         try:
             from XianyuApis import XianyuApis
@@ -296,6 +361,17 @@ class BridgeManager:
                     self.login_task = asyncio.create_task(self.handle_login())
                 else:
                     logger.warning("登录已在进行中，忽略重复请求")
+
+            elif action == "generate_prompts":
+                chat_log = cmd.get("chat_log", "")
+                if not chat_log.strip():
+                    emit_generate_prompts_result(False, message="聊天记录不能为空")
+                elif not self.generate_task or self.generate_task.done():
+                    self.generate_task = asyncio.create_task(
+                        self.handle_generate_prompts(chat_log)
+                    )
+                else:
+                    logger.warning("AI 生成已在进行中，忽略重复请求")
 
             elif action == "check_login":
                 if not self.check_login_task or self.check_login_task.done():
