@@ -24,14 +24,6 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Cookie 字符串 (COOKIES_STR)</label>
-            <textarea
-              v-model="form.COOKIES_STR"
-              rows="4"
-              placeholder="从浏览器开发者工具复制完整 Cookie"
-            />
-          </div>
         </section>
 
         <!-- Model -->
