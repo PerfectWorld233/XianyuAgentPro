@@ -1,5 +1,22 @@
 <template>
   <div class="page">
+    <!-- 登录状态横幅 -->
+    <div v-if="botStore.loginStatus === 'checking'" class="login-banner banner-checking">
+      正在检测闲鱼登录状态…
+    </div>
+    <div v-else-if="botStore.loginStatus === 'logged_out'" class="login-banner banner-warn">
+      未检测到闲鱼登录，请先扫码登录才能启动机器人。
+      <button
+        class="btn btn-login banner-login-btn"
+        :disabled="loginState === 'pending'"
+        @click="doLogin"
+      >
+        {{ loginState === 'pending' ? '登录中…' : '立即扫码登录' }}
+      </button>
+    </div>
+    <div v-else-if="botStore.loginStatus === 'logged_in'" class="login-banner banner-ok">
+      闲鱼已登录
+    </div>
     <div class="page-header">
       <div class="header-left">
         <h1 class="page-title">控制台</h1>
@@ -57,7 +74,14 @@ async function doLogin() {
 
 onMounted(() => {
   window.electronAPI.onLoginResult((msg) => {
-    loginState.value = msg.success ? 'success' : 'failed'
+    if (msg.success) {
+      loginState.value = 'success'
+      // 登录成功后重新触发登录状态检查
+      botStore.setLoginStatus('checking')
+      window.electronAPI.checkLogin()
+    } else {
+      loginState.value = 'failed'
+    }
     setTimeout(() => {
       loginState.value = 'idle'
     }, 3000)
@@ -163,5 +187,37 @@ onMounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.login-banner {
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.banner-checking {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.banner-warn {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.banner-ok {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.banner-login-btn {
+  padding: 5px 14px;
+  font-size: 12px;
 }
 </style>
