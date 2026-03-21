@@ -4,11 +4,12 @@ bridge.py — IPC bridge between Electron and the XianyuAutoAgent Python backend
 Communication protocol: JSON lines on stdout (to Electron) / stdin (from Electron).
 
 Outbound message types:
-  {"type": "log",          "level": "info|debug|warning|error", "message": "...", "time": "ISO"}
-  {"type": "status",       "running": true|false}
-  {"type": "error",        "code": "...", "message": "..."}
-  {"type": "login_result", "success": true|false, "message": "..."}
-  {"type": "login_status", "logged_in": true|false, "username": ""}
+  {"type": "log",                    "level": "info|debug|warning|error", "message": "...", "time": "ISO"}
+  {"type": "status",                 "running": true|false}
+  {"type": "error",                  "code": "...", "message": "..."}
+  {"type": "login_result",           "success": true|false, "message": "..."}
+  {"type": "login_status",           "logged_in": true|false, "username": ""}
+  {"type": "generate_prompts_result","success": true|false, "prompts": {...}, "message": "..."}
 
 Inbound commands:
   {"cmd": "start"}
@@ -16,6 +17,7 @@ Inbound commands:
   {"cmd": "reload_config"}
   {"cmd": "login"}
   {"cmd": "check_login"}
+  {"cmd": "generate_prompts", "chat_log": "..."}
 """
 
 import asyncio
@@ -240,9 +242,9 @@ class BridgeManager:
     async def handle_generate_prompts(self, chat_log: str):
         logger.info("正在调用 AI 分析聊天记录，生成提示词…")
         try:
-            from openai import OpenAI
+            from openai import AsyncOpenAI
             config = self.config_manager.get_config()
-            client = OpenAI(
+            client = AsyncOpenAI(
                 api_key=config.get("API_KEY", ""),
                 base_url=config.get("MODEL_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
             )
@@ -261,7 +263,7 @@ class BridgeManager:
                 '{"classify_prompt": "...", "price_prompt": "...", "tech_prompt": "...", "default_prompt": "..."}'
             )
 
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -274,9 +276,13 @@ class BridgeManager:
             raw = response.choices[0].message.content.strip()
             # Strip markdown code fences if present
             if raw.startswith("```"):
-                raw = "\n".join(raw.splitlines()[1:])
-                if raw.endswith("```"):
-                    raw = raw[: raw.rfind("```")]
+                lines = raw.splitlines()
+                # Remove opening fence line (```json or ```)
+                lines = lines[1:]
+                # Remove closing fence line if present
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                raw = "\n".join(lines).strip()
             prompts = json.loads(raw)
 
             required = {"classify_prompt", "price_prompt", "tech_prompt", "default_prompt"}
