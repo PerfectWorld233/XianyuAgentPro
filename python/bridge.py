@@ -8,12 +8,14 @@ Outbound message types:
   {"type": "status",       "running": true|false}
   {"type": "error",        "code": "...", "message": "..."}
   {"type": "login_result", "success": true|false, "message": "..."}
+  {"type": "login_status", "logged_in": true|false, "username": ""}
 
 Inbound commands:
   {"cmd": "start"}
   {"cmd": "stop"}
   {"cmd": "reload_config"}
   {"cmd": "login"}
+  {"cmd": "check_login"}
 """
 
 import asyncio
@@ -86,6 +88,12 @@ def emit_login_result(success: bool, message: str):
     sys.stdout.flush()
 
 
+def emit_login_status(logged_in: bool, username: str = ""):
+    payload = {"type": "login_status", "logged_in": logged_in, "username": username}
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
 # ---------------------------------------------------------------------------
 # Stdin reader thread (Windows asyncio stdin not reliable)
 # ---------------------------------------------------------------------------
@@ -113,6 +121,7 @@ class BridgeManager:
         self.config_manager = None
         self.bot_task: asyncio.Task = None
         self.login_task: asyncio.Task = None
+        self.check_login_task: asyncio.Task = None
 
     def load_modules(self):
         """Import project modules (supports both source and PyInstaller bundle)."""
@@ -216,6 +225,19 @@ class BridgeManager:
             logger.warning("扫码登录超时或失败，请重试")
             emit_login_result(False, "登录超时或失败，请重试")
 
+    async def handle_check_login(self):
+        try:
+            from XianyuApis import XianyuApis
+            cookies_str = self.config_manager.get_value("COOKIES_STR", "")
+            # config_manager=None 的临时实例：hasLogin() 内的 update_env_cookies 会打印警告但不影响功能
+            ok, username = await asyncio.get_event_loop().run_in_executor(
+                None, XianyuApis.check_login_status, cookies_str
+            )
+            emit_login_status(ok, username)
+        except Exception as e:
+            logger.warning(f"check_login 异常: {e}")
+            emit_login_status(False, "")
+
     async def run(self):
         loop = asyncio.get_running_loop()
         cmd_queue: asyncio.Queue = asyncio.Queue()
@@ -274,6 +296,12 @@ class BridgeManager:
                     self.login_task = asyncio.create_task(self.handle_login())
                 else:
                     logger.warning("登录已在进行中，忽略重复请求")
+
+            elif action == "check_login":
+                if not self.check_login_task or self.check_login_task.done():
+                    self.check_login_task = asyncio.create_task(self.handle_check_login())
+                else:
+                    logger.debug("登录状态检查中，忽略重复请求")
 
             else:
                 logger.warning(f"未知命令: {action}")
