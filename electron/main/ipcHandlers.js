@@ -19,6 +19,10 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     sendCommand({ cmd: 'check_login' })
   })
 
+  ipcMain.handle('prompts:generate', (_event, chatLog) => {
+    sendCommand({ cmd: 'generate_prompts', chat_log: chatLog })
+  })
+
   // Config
   ipcMain.handle('config:get', () => {
     return getConfig()
