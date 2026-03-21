@@ -54,6 +54,7 @@ async function triggerLoginCheck() {
     // IPC invoke 本身成功（Python 已收到命令），等待 onLoginStatus 回调返回结果
   } catch {
     // 超时：Python 未响应，设回 unknown
+    console.warn('[LoginCheck] 登录状态检查超时（Python 未响应）')
     if (seq === loginCheckSeq) {
       botStore.setLoginStatus('unknown')
     }
