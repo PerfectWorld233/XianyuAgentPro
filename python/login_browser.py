@@ -23,38 +23,42 @@ async def browser_login(config_manager) -> bool:
             "playwright 未安装，请执行: pip install playwright && playwright install chromium"
         )
 
+    playwright = await async_playwright().start()
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False)
-            context = await browser.new_context()
-            page = await context.new_page()
+        browser = await playwright.chromium.launch(headless=False)
+        context = await browser.new_context()
+        page = await context.new_page()
 
-            await page.goto("https://www.goofish.com")
+        await page.goto("https://www.goofish.com")
 
-            # Poll for the 'unb' cookie (appears after successful login)
-            max_wait_seconds = 120
-            poll_interval = 2
-            elapsed = 0
+        # Poll for the 'unb' cookie (appears after successful login)
+        max_wait_seconds = 120
+        poll_interval = 2
+        elapsed = 0
 
-            while elapsed < max_wait_seconds:
-                await asyncio.sleep(poll_interval)
-                elapsed += poll_interval
+        while elapsed < max_wait_seconds:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
 
-                cookies = await context.cookies()
-                unb = next((c for c in cookies if c.get("name") == "unb" and c.get("value")), None)
+            cookies = await context.cookies(["https://www.goofish.com", "https://www.taobao.com", "https://www.alipay.com"])
+            unb = next((c for c in cookies if c.get("name") == "unb" and c.get("value")), None)
 
-                if unb:
-                    # Build "key=value; ..." string from all cookies
-                    cookie_str = "; ".join(
-                        f"{c['name']}={c['value']}" for c in cookies
-                    )
-                    config_manager.update_cookies(cookie_str)
-                    await browser.close()
-                    return True
+            if unb:
+                # Build "key=value; ..." string from all cookies
+                cookie_str = "; ".join(
+                    f"{c['name']}={c['value']}" for c in cookies
+                )
+                config_manager.update_cookies(cookie_str)
+                return True
 
-            # Timed out
-            await browser.close()
-            return False
+        # Timed out
+        await browser.close()
+        await playwright.stop()
+        return False
 
     except Exception:
+        try:
+            await playwright.stop()
+        except Exception:
+            pass
         return False
