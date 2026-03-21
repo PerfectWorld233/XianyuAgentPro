@@ -16,7 +16,7 @@
               <input
                 :type="showApiKey ? 'text' : 'password'"
                 v-model="form.API_KEY"
-                placeholder="填入阿里云百炼 API Key"
+                :placeholder="selectedPlatform ? selectedPlatform.apiKeyHint : '填入 API Key'"
               />
               <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
                 {{ showApiKey ? '隐藏' : '显示' }}
@@ -31,6 +31,22 @@
           <h2 class="section-title">模型配置</h2>
 
           <div class="form-group">
+            <label>快速选择平台</label>
+            <div class="platform-grid">
+              <button
+                v-for="p in platforms"
+                :key="p.name"
+                type="button"
+                class="platform-btn"
+                :class="{ active: form.MODEL_BASE_URL === p.baseUrl }"
+                @click="selectPlatform(p)"
+              >
+                {{ p.name }}
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
             <label>API Base URL</label>
             <input v-model="form.MODEL_BASE_URL" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
           </div>
@@ -40,14 +56,12 @@
             <input
               v-model="form.MODEL_NAME"
               list="model-suggestions"
-              placeholder="qwen-max"
+              :placeholder="selectedPlatform ? selectedPlatform.defaultModel : 'qwen-max'"
             />
             <datalist id="model-suggestions">
-              <option value="qwen-max" />
-              <option value="qwen-plus" />
-              <option value="qwen-turbo" />
-              <option value="qwen-long" />
+              <option v-for="m in modelSuggestions" :key="m" :value="m" />
             </datalist>
+            <p v-if="selectedPlatform" class="hint">{{ selectedPlatform.hint }}</p>
           </div>
         </section>
 
@@ -112,6 +126,62 @@ const saved = ref(false)
 const showApiKey = ref(false)
 const showAdvanced = ref(false)
 
+const platforms = [
+  {
+    name: '阿里云百炼',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultModel: 'qwen-max',
+    models: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long'],
+    apiKeyHint: '填入阿里云百炼 API Key',
+    hint: '推荐模型：qwen-max / qwen-plus',
+  },
+  {
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+    apiKeyHint: '填入 DeepSeek API Key',
+    hint: '价格极低，推荐模型：deepseek-chat',
+  },
+  {
+    name: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    defaultModel: 'glm-4-flash',
+    models: ['glm-4-flash', 'glm-4', 'glm-4-air'],
+    apiKeyHint: '填入智谱 AI API Key',
+    hint: 'glm-4-flash 免费，推荐新用户使用',
+  },
+  {
+    name: 'Moonshot',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    defaultModel: 'moonshot-v1-8k',
+    models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+    apiKeyHint: '填入 Moonshot API Key',
+    hint: '注册即送额度，推荐：moonshot-v1-8k',
+  },
+  {
+    name: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o-mini',
+    models: ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
+    apiKeyHint: '填入 OpenAI API Key (sk-...)',
+    hint: '需海外网络，推荐：gpt-4o-mini',
+  },
+]
+
+const selectedPlatform = computed(() =>
+  platforms.find(p => p.baseUrl === form.value.MODEL_BASE_URL) || null
+)
+
+const modelSuggestions = computed(() =>
+  selectedPlatform.value ? selectedPlatform.value.models : ['qwen-max', 'qwen-plus', 'qwen-turbo']
+)
+
+function selectPlatform(p) {
+  form.value.MODEL_BASE_URL = p.baseUrl
+  form.value.MODEL_NAME = p.defaultModel
+}
+
 const simulateHumanTyping = computed({
   get: () => form.value.SIMULATE_HUMAN_TYPING === 'True',
   set: (v) => { form.value.SIMULATE_HUMAN_TYPING = v ? 'True' : 'False' },
@@ -135,7 +205,7 @@ async function save() {
   saving.value = true
   saved.value = false
   try {
-    await window.electronAPI.saveConfig(form.value)
+    await window.electronAPI.saveConfig({ ...form.value })
     saved.value = true
     setTimeout(() => { saved.value = false }, 3000)
   } finally {
@@ -298,5 +368,34 @@ async function save() {
   color: #94a3b8;
   text-align: center;
   margin-top: 60px;
+}
+
+.platform-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.platform-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.platform-btn:hover {
+  border-color: #4a9eff;
+  color: #4a9eff;
+}
+
+.platform-btn.active {
+  background: #4a9eff;
+  border-color: #4a9eff;
+  color: #fff;
+  font-weight: 500;
 }
 </style>
