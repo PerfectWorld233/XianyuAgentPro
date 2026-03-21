@@ -124,6 +124,41 @@ class XianyuApis:
             time.sleep(0.5)
             return self.hasLogin(retry_count + 1)
 
+    @staticmethod
+    def check_login_status(cookies_str: str) -> tuple:
+        """
+        检查登录状态。
+        先快检 cookies_str 是否含非空 unb 字段，
+        再实例化临时 XianyuApis 发 HTTP 请求验证。
+        返回 (True, "") 或 (False, "")。
+        """
+        # 快检：解析 cookie 字符串，查找 unb
+        unb = ""
+        for part in cookies_str.split(";"):
+            part = part.strip()
+            if part.startswith("unb="):
+                unb = part[4:].strip()
+                break
+        if not unb:
+            logger.debug("快检失败：未找到 unb 字段")
+            return False, ""
+
+        # HTTP 验证
+        try:
+            api = XianyuApis()
+            # 将 cookies_str 加载到 session
+            from http.cookies import SimpleCookie
+            cookie = SimpleCookie()
+            cookie.load(cookies_str)
+            for key, morsel in cookie.items():
+                api.session.cookies.set(key, morsel.value, domain='.goofish.com')
+
+            ok = api.hasLogin()
+            return ok, ""
+        except Exception as e:
+            logger.warning(f"登录状态 HTTP 验证异常: {e}")
+            return False, ""
+
     def get_token(self, device_id, retry_count=0):
         if retry_count >= 2:
             logger.warning("获取token失败，尝试重新登陆")
