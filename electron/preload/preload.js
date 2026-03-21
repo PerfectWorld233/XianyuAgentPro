@@ -28,4 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Login status check
   checkLogin: () => ipcRenderer.invoke('bot:check_login'),
   onLoginStatus: (cb) => ipcRenderer.on('bot:login_status', (_event, msg) => cb(msg)),
+
+  // AI prompt generation
+  generatePrompts: (chatLog) => ipcRenderer.invoke('prompts:generate', chatLog),
+  onGeneratePromptsResult: (cb) => ipcRenderer.on('bot:generate_prompts_result', (_event, msg) => cb(msg)),
 })
