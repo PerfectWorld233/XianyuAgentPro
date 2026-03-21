@@ -4,6 +4,33 @@
       <h1 class="page-title">提示词编辑</h1>
     </div>
 
+    <!-- AI 生成面板 -->
+    <div class="ai-panel">
+      <div class="ai-panel-header" @click="showAiPanel = !showAiPanel">
+        <span>AI 生成提示词（粘贴聊天记录）</span>
+        <span class="chevron">{{ showAiPanel ? '▲' : '▼' }}</span>
+      </div>
+      <div v-if="showAiPanel" class="ai-panel-body">
+        <textarea
+          class="chat-log-input"
+          v-model="chatLog"
+          rows="6"
+          placeholder="将买卖双方的聊天记录粘贴到此处…"
+          spellcheck="false"
+        />
+        <div class="ai-actions">
+          <button
+            class="btn btn-ai"
+            :disabled="generating || !chatLog.trim()"
+            @click="generatePrompts"
+          >
+            {{ generating ? 'AI 生成中…' : 'AI 生成' }}
+          </button>
+          <span v-if="generateError" class="generate-err">✗ {{ generateError }}</span>
+        </div>
+      </div>
+    </div>
+
     <div class="prompts-body" v-if="loaded">
       <!-- Tabs -->
       <div class="tabs">
@@ -64,11 +91,25 @@ const defaults = ref({})
 const loaded = ref(false)
 const saving = ref(false)
 const saved = ref(false)
+const chatLog = ref('')
+const generating = ref(false)
+const generateError = ref('')
+const showAiPanel = ref(false)
 
 onMounted(async () => {
   form.value = await window.electronAPI.getPrompts()
   // Store originals as soft defaults (before any edits this session)
   defaults.value = { ...form.value }
+  window.electronAPI.onGeneratePromptsResult((msg) => {
+    generating.value = false
+    if (msg.success) {
+      Object.assign(form.value, msg.prompts)
+      showAiPanel.value = false
+      activeTab.value = 'classify_prompt'
+    } else {
+      generateError.value = msg.message || '生成失败，请重试'
+    }
+  })
   loaded.value = true
 })
 
@@ -76,6 +117,12 @@ function resetPrompt(key) {
   if (confirm(`确定要恢复 "${tabs.find(t => t.key === key)?.label}" 提示词为当前默认内容吗？`)) {
     form.value[key] = defaults.value[key] || ''
   }
+}
+
+async function generatePrompts() {
+  generating.value = true
+  generateError.value = ''
+  await window.electronAPI.generatePrompts(chatLog.value)
 }
 
 async function save() {
@@ -226,5 +273,84 @@ async function save() {
   color: #94a3b8;
   text-align: center;
   margin-top: 60px;
+}
+
+.ai-panel {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.ai-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-panel-header:hover {
+  background: #f8fafc;
+}
+
+.ai-panel-body {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-log-input {
+  width: 100%;
+  resize: vertical;
+  font-size: 12px;
+  font-family: 'Consolas', monospace;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px;
+  color: #1e2030;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.chat-log-input:focus {
+  border-color: #4a9eff;
+  outline: none;
+}
+
+.ai-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-ai {
+  background: #7c3aed;
+  color: #fff;
+  padding: 7px 18px;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.btn-ai:not(:disabled):hover {
+  background: #6d28d9;
+}
+
+.btn-ai:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.generate-err {
+  font-size: 12px;
+  color: #d20f39;
 }
 </style>
