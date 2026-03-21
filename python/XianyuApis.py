@@ -132,13 +132,15 @@ class XianyuApis:
         再实例化临时 XianyuApis 发 HTTP 请求验证。
         返回 (True, "") 或 (False, "")。
         """
-        # 快检：解析 cookie 字符串，查找 unb
+        # 快检：解析 cookie 字符串，查找 unb（使用精确匹配）
         unb = ""
         for part in cookies_str.split(";"):
             part = part.strip()
-            if part.startswith("unb="):
-                unb = part[4:].strip()
-                break
+            if "=" in part:
+                key, val = part.split("=", 1)
+                if key.strip() == "unb" and val.strip():
+                    unb = val.strip()
+                    break
         if not unb:
             logger.debug("快检失败：未找到 unb 字段")
             return False, ""
@@ -153,7 +155,32 @@ class XianyuApis:
             for key, morsel in cookie.items():
                 api.session.cookies.set(key, morsel.value, domain='.goofish.com')
 
-            ok = api.hasLogin()
+            # Inline HTTP check with explicit timeout (bypasses hasLogin retry logic)
+            url = 'https://passport.goofish.com/newlogin/hasLogin.do'
+            params = {'appName': 'xianyu', 'fromSite': '77'}
+            data = {
+                'hid': api.session.cookies.get('unb', ''),
+                'ltl': 'true',
+                'appName': 'xianyu',
+                'appEntrance': 'web',
+                '_csrf_token': api.session.cookies.get('XSRF-TOKEN', ''),
+                'umidToken': '',
+                'hsiz': api.session.cookies.get('cookie2', ''),
+                'bizParams': 'taobaoBizLoginFrom=web',
+                'mainPage': 'false',
+                'isMobile': 'false',
+                'lang': 'zh_CN',
+                'returnUrl': '',
+                'fromSite': '77',
+                'isIframe': 'true',
+                'documentReferer': 'https://www.goofish.com/',
+                'defaultView': 'hasLogin',
+                'umidTag': 'SERVER',
+                'deviceId': api.session.cookies.get('cna', ''),
+            }
+            response = api.session.post(url, params=params, data=data, timeout=5)
+            res_json = response.json()
+            ok = bool(res_json.get('content', {}).get('success'))
             return ok, ""
         except Exception as e:
             logger.warning(f"登录状态 HTTP 验证异常: {e}")
