@@ -15,6 +15,10 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     sendCommand({ cmd: 'login' })
   })
 
+  ipcMain.handle('bot:check_login', () => {
+    sendCommand({ cmd: 'check_login' })
+  })
+
   // Config
   ipcMain.handle('config:get', () => {
     return getConfig()

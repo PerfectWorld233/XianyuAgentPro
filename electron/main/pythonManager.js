@@ -4,7 +4,7 @@ const readline = require('readline')
 
 let proc = null
 let mainWindow = null
-const listeners = { log: [], status: [], error: [], login_result: [] }
+const listeners = { log: [], status: [], error: [], login_result: [], login_status: [] }
 
 function getPythonExe() {
   if (process.env.VITE_DEV_SERVER_URL) {
