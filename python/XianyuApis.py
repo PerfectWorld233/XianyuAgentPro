@@ -1,6 +1,4 @@
 import time
-import os
-import re
 import sys
 import json
 
@@ -45,32 +43,11 @@ class XianyuApis:
         self.update_env_cookies()
 
     def update_env_cookies(self):
-        """更新 Cookie 存储（bridge 模式写数据库，否则写 .env 文件）"""
+        """更新 Cookie 存储到数据库"""
         try:
             cookie_str = '; '.join([f"{c.name}={c.value}" for c in self.session.cookies])
-
             if self.config_manager:
                 self.config_manager.update_cookies(cookie_str)
-                return
-
-            # 原有 .env 写入逻辑（开发者直接运行 main.py 时使用）
-            env_path = os.path.join(os.getcwd(), '.env')
-            if not os.path.exists(env_path):
-                logger.warning(".env文件不存在，无法更新COOKIES_STR")
-                return
-            with open(env_path, 'r', encoding='utf-8') as f:
-                env_content = f.read()
-            if 'COOKIES_STR=' in env_content:
-                new_env_content = re.sub(
-                    r'COOKIES_STR=.*',
-                    f'COOKIES_STR={cookie_str}',
-                    env_content
-                )
-                with open(env_path, 'w', encoding='utf-8') as f:
-                    f.write(new_env_content)
-                logger.debug("已更新.env文件中的COOKIES_STR")
-            else:
-                logger.warning(".env文件中未找到COOKIES_STR配置项")
         except Exception as e:
             logger.warning(f"更新Cookie存储失败: {str(e)}")
 
@@ -194,14 +171,11 @@ class XianyuApis:
                 return self.get_token(device_id, 0)
             else:
                 logger.error("重新登录失败，Cookie已失效")
-                if os.environ.get('BRIDGE_MODE') == '1':
-                    print(json.dumps({
-                        "type": "error",
-                        "code": "COOKIE_EXPIRED",
-                        "message": "Cookie已失效，请在设置页面更新Cookie后重新启动机器人"
-                    }, ensure_ascii=False), flush=True)
-                    sys.exit(1)
-                logger.error("🔴 程序即将退出，请更新.env文件中的COOKIES_STR后重新启动")
+                print(json.dumps({
+                    "type": "error",
+                    "code": "COOKIE_EXPIRED",
+                    "message": "Cookie已失效，请在设置页面更新Cookie后重新启动机器人"
+                }, ensure_ascii=False), flush=True)
                 sys.exit(1)
 
         params = {
@@ -241,37 +215,12 @@ class XianyuApis:
                     error_msg = str(ret_value)
                     if 'RGV587_ERROR' in error_msg or '被挤爆啦' in error_msg:
                         logger.error(f"触发风控: {ret_value}")
-
-                        if os.environ.get('BRIDGE_MODE') == '1':
-                            print(json.dumps({
-                                "type": "error",
-                                "code": "WIND_CONTROL",
-                                "message": "触发风控，请在设置页面更新Cookie后重新启动机器人"
-                            }, ensure_ascii=False), flush=True)
-                            sys.exit(1)
-
-                        # 原有交互逻辑（非 bridge 模式）
-                        print("\n" + "=" * 50)
-                        new_cookie_str = input("请输入新的Cookie字符串 (复制浏览器中的完整cookie，直接回车则退出程序): ").strip()
-                        print("=" * 50 + "\n")
-
-                        if new_cookie_str:
-                            try:
-                                from http.cookies import SimpleCookie
-                                cookie = SimpleCookie()
-                                cookie.load(new_cookie_str)
-                                self.session.cookies.clear()
-                                for key, morsel in cookie.items():
-                                    self.session.cookies.set(key, morsel.value, domain='.goofish.com')
-                                logger.success("Cookie已更新，正在尝试重连...")
-                                self.update_env_cookies()
-                                return self.get_token(device_id, 0)
-                            except Exception as e:
-                                logger.error(f"Cookie解析失败: {e}")
-                                sys.exit(1)
-                        else:
-                            logger.info("用户取消输入，程序退出")
-                            sys.exit(1)
+                        print(json.dumps({
+                            "type": "error",
+                            "code": "WIND_CONTROL",
+                            "message": "触发风控，请在设置页面更新Cookie后重新启动机器人"
+                        }, ensure_ascii=False), flush=True)
+                        sys.exit(1)
 
                     logger.warning(f"Token API调用失败，错误信息: {ret_value}")
                     if 'Set-Cookie' in response.headers:
