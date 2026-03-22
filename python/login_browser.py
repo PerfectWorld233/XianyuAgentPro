@@ -1,30 +1,41 @@
 """
-login_browser.py — CDP-based browser login for Xianyu.
+login_browser.py — Pure-CDP browser login for Xianyu (no Playwright).
 
-Launches (or connects to) the user's real Chrome/Edge browser via Chrome
-DevTools Protocol instead of Playwright's bundled Chromium.  A real browser
-carries authentic fingerprints (navigator.webdriver stays false, real plugin
-list, genuine cna/device cookies, etc.) which avoids Xianyu's risk-control
-triggers caused by automation detection.
+Launches (or connects to) the user's real Chrome/Edge browser via the
+Chrome DevTools Protocol using only the standard `websockets` + `aiohttp`
+libraries — no Playwright, no bundled Chromium.
+
+A real browser carries authentic fingerprints (navigator.webdriver stays
+false, real plugin list, genuine cna/device cookies, etc.) which avoids
+Xianyu's risk-control triggers.
 
 Profile is stored in %APPDATA%\XianyuAutoAgent\browser_profile\ so device
 cookies (cna, _uab_uid, …) persist across sessions.
 
-On success the full cookie string is saved via config_manager and the browser
-is navigated to the Xianyu messages page (/im).
+On success the full cookie string is saved via config_manager and the
+browser is navigated to the Xianyu messages page (/im).
 """
 
 import asyncio
+import json
 import os
 import socket
 import subprocess
 
+import aiohttp
 from loguru import logger
 
 
 REMOTE_DEBUGGING_PORT = 9222
 XIANYU_URL = "https://www.goofish.com"
 XIANYU_IM_URL = "https://www.goofish.com/im"
+CDP_BASE = f"http://localhost:{REMOTE_DEBUGGING_PORT}"
+
+COOKIE_DOMAINS = [
+    "goofish.com",
+    "taobao.com",
+    "alipay.com",
+]
 
 
 def _get_profile_dir() -> str:
@@ -37,21 +48,21 @@ def _get_profile_dir() -> str:
 
 def _find_browser() -> str:
     """
-    Find the path to Edge or Chrome on Windows.
-    Edge is tried first — it ships with every Windows 10/11 installation.
+    Find the path to Chrome or Edge on Windows.
+    Chrome is tried first per user request; Edge as fallback.
     Raises RuntimeError if neither browser is found.
     """
     candidates = [
-        # Edge — system-wide
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        # Edge — per-user
-        os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"),
         # Chrome — system-wide
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
         # Chrome — per-user
         os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+        # Edge — system-wide
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        # Edge — per-user
+        os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"),
     ]
     for path in candidates:
         if os.path.isfile(path):
@@ -87,31 +98,63 @@ def _launch_browser(exe: str, profile_dir: str, port: int) -> subprocess.Popen:
     )
 
 
-async def _connect_with_retry(playwright, port: int, retries: int = 6, interval: float = 1.0):
-    """Try to connect via CDP, retrying while the browser is still starting up."""
+async def _get_target_ws_url(session: aiohttp.ClientSession, retries: int = 8, interval: float = 1.0) -> str:
+    """
+    Poll the CDP /json endpoint until a page target is available.
+    Returns the webSocketDebuggerUrl of the first page target.
+    """
     for attempt in range(retries):
         try:
-            return await playwright.chromium.connect_over_cdp(
-                f"http://localhost:{port}"
-            )
+            async with session.get(f"{CDP_BASE}/json") as resp:
+                targets = await resp.json(content_type=None)
+                # Prefer a page that already has our URL, else any page target
+                for t in targets:
+                    if t.get("type") == "page":
+                        return t["webSocketDebuggerUrl"]
         except Exception:
-            if attempt < retries - 1:
-                await asyncio.sleep(interval)
-    raise RuntimeError(f"无法连接到浏览器调试端口 {port}，请检查浏览器是否正常启动。")
+            pass
+        if attempt < retries - 1:
+            await asyncio.sleep(interval)
+    raise RuntimeError(f"无法连接到浏览器调试端口 {REMOTE_DEBUGGING_PORT}，请检查浏览器是否正常启动。")
+
+
+async def _cdp_call(ws, method: str, params: dict | None = None, msg_id: int = 1) -> dict:
+    """Send a CDP command and wait for its matching response."""
+    payload = {"id": msg_id, "method": method, "params": params or {}}
+    await ws.send(json.dumps(payload))
+    while True:
+        raw = await ws.recv()
+        msg = json.loads(raw)
+        if msg.get("id") == msg_id:
+            return msg.get("result", {})
+
+
+async def _open_new_tab(session: aiohttp.ClientSession) -> str:
+    """Open a new tab via CDP /json/new and return its webSocketDebuggerUrl."""
+    async with session.get(f"{CDP_BASE}/json/new?{XIANYU_URL}") as resp:
+        target = await resp.json(content_type=None)
+        return target["webSocketDebuggerUrl"]
+
+
+async def _get_all_cookies(ws, msg_id_start: int = 10) -> list[dict]:
+    """Retrieve all browser cookies via CDP Network.getAllCookies."""
+    result = await _cdp_call(ws, "Network.getAllCookies", msg_id=msg_id_start)
+    return result.get("cookies", [])
 
 
 async def browser_login(config_manager) -> bool:
     """
-    Connect to (or launch) the user's real Chrome/Edge via CDP, wait for the
-    user to scan the Xianyu QR code, then extract and persist all cookies.
+    Connect to (or launch) the user's real Chrome/Edge via pure CDP,
+    wait for the user to scan the Xianyu QR code, then extract and
+    persist all cookies.
 
     Returns True on success, False on timeout or error.
     """
     try:
-        from playwright.async_api import async_playwright
+        import aiohttp  # noqa: F401 — already imported at module level, verify available
     except ImportError:
         raise RuntimeError(
-            "playwright 未安装，请执行: pip install playwright && playwright install chromium"
+            "aiohttp 未安装，请执行: pip install aiohttp"
         )
 
     profile_dir = _get_profile_dir()
@@ -125,61 +168,66 @@ async def browser_login(config_manager) -> bool:
     else:
         logger.debug(f"端口 {REMOTE_DEBUGGING_PORT} 已有浏览器，直接连接")
 
-    playwright = await async_playwright().start()
     try:
-        browser = await _connect_with_retry(playwright, REMOTE_DEBUGGING_PORT)
-        logger.info("已通过 CDP 连接到真实浏览器")
+        import websockets
+    except ImportError:
+        raise RuntimeError("websockets 未安装，请执行: pip install websockets")
 
-        # Reuse the browser's existing context (carries real cookies / fingerprint)
-        contexts = browser.contexts
-        context = contexts[0] if contexts else await browser.new_context()
+    try:
+        async with aiohttp.ClientSession() as http:
+            ws_url = await _get_target_ws_url(http)
+            logger.info("已通过 CDP 连接到真实浏览器")
 
-        # Open a new tab and navigate to Xianyu
-        page = await context.new_page()
-        await page.goto(XIANYU_URL)
-        logger.info("已打开闲鱼首页，请在浏览器中扫码登录…")
+            # Open a new tab and navigate to Xianyu
+            new_tab_url = await _open_new_tab(http)
 
-        # Poll for the 'unb' cookie that appears after successful QR login
-        max_wait_seconds = 120
-        poll_interval = 2
-        elapsed = 0
+        async with websockets.connect(new_tab_url) as ws:  # type: ignore[attr-defined]
+            msg_id = 1
 
-        while elapsed < max_wait_seconds:
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
+            # Enable the Network domain so we can read cookies
+            await _cdp_call(ws, "Network.enable", msg_id=msg_id); msg_id += 1
 
-            cookies = await context.cookies([
-                "https://www.goofish.com",
-                "https://www.taobao.com",
-                "https://www.alipay.com",
-            ])
-            unb = next(
-                (c for c in cookies if c.get("name") == "unb" and c.get("value")),
-                None,
-            )
+            # Navigate to Xianyu login page
+            await _cdp_call(ws, "Page.navigate", {"url": XIANYU_URL}, msg_id=msg_id); msg_id += 1
+            logger.info("已打开闲鱼首页，请在浏览器中扫码登录…")
 
-            if unb:
-                cookie_str = "; ".join(
-                    f"{c['name']}={c['value']}" for c in cookies
+            # Poll for the 'unb' cookie that appears after successful QR login
+            max_wait_seconds = 120
+            poll_interval = 2
+            elapsed = 0
+
+            while elapsed < max_wait_seconds:
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
+
+                cookies = await _get_all_cookies(ws, msg_id_start=msg_id)
+                msg_id += 1
+
+                unb = next(
+                    (c for c in cookies
+                     if c.get("name") == "unb" and c.get("value")
+                     and any(d in c.get("domain", "") for d in COOKIE_DOMAINS)),
+                    None,
                 )
-                config_manager.update_cookies(cookie_str)
-                logger.info("Cookie 已保存，跳转到消息列表页")
-                # Navigate to messages page — leave browser open for the user
-                await page.goto(XIANYU_IM_URL)
-                return True
 
-        # Timed out — close the tab we opened, leave the browser running
-        logger.warning("等待登录超时（120 秒），已关闭标签页")
-        await page.close()
-        return False
+                if unb:
+                    # Filter to relevant domains only
+                    relevant = [
+                        c for c in cookies
+                        if any(d in c.get("domain", "") for d in COOKIE_DOMAINS)
+                    ]
+                    cookie_str = "; ".join(
+                        f"{c['name']}={c['value']}" for c in relevant
+                    )
+                    config_manager.update_cookies(cookie_str)
+                    logger.info("Cookie 已保存，跳转到消息列表页")
+                    # Navigate to messages page — leave browser open for the user
+                    await _cdp_call(ws, "Page.navigate", {"url": XIANYU_IM_URL}, msg_id=msg_id)
+                    return True
+
+            logger.warning("等待登录超时（120 秒）")
+            return False
 
     except Exception as e:
         logger.error(f"CDP 登录异常: {e}")
         return False
-
-    finally:
-        # Disconnect Playwright client — does NOT close the real browser
-        try:
-            await playwright.stop()
-        except Exception:
-            pass

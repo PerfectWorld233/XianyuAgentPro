@@ -223,7 +223,7 @@ class BridgeManager:
         logger.info("机器人已停止")
 
     async def handle_login(self):
-        logger.info("正在启动浏览器登录，请在弹出的 Chromium 窗口中扫码…")
+        logger.info("正在启动浏览器登录，请在弹出的浏览器窗口中扫码…")
         try:
             from login_browser import browser_login
             success = await browser_login(self.config_manager)

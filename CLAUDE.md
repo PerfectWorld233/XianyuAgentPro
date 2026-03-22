@@ -72,9 +72,6 @@ LLM prompts are stored in the SQLite database (`prompts` table) and editable via
 # Install Python dependencies
 pip install -r python/requirements.txt
 
-# Install Playwright browser (for QR code login)
-playwright install chromium
-
 # Install Electron dependencies
 cd electron
 npm install
@@ -99,7 +96,7 @@ npm run dev
 │   ├── XianyuApis.py       # HTTP API wrapper for platform
 │   ├── context_manager.py  # SQLite conversation storage
 │   ├── config_manager.py   # SQLite config & prompts manager
-│   ├── login_browser.py    # Playwright QR code login
+│   ├── login_browser.py    # Pure-CDP QR code login (Chrome/Edge via aiohttp + websockets)
 │   ├── utils/
 │   │   └── xianyu_utils.py # Utility functions (cookies, signatures, crypto)
 │   └── requirements.txt
@@ -150,7 +147,7 @@ Messages are validated before processing:
 - `websockets` - WebSocket connection handling
 - `loguru` - Structured logging
 - `requests` - HTTP requests for API calls
-- `playwright` - Browser automation for QR code login
+- `aiohttp` - HTTP client for CDP browser control (QR code login)
 
 ### Node.js (`electron/package.json`)
 - `electron` - Desktop app framework
