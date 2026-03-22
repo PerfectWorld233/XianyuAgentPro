@@ -22,14 +22,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   savePrompts: (data) => ipcRenderer.invoke('prompts:save', data),
   getDefaultPrompts: () => ipcRenderer.invoke('prompts:get_defaults'),
 
-  // Login (QR code browser flow)
-  botLogin: () => ipcRenderer.invoke('bot:login'),
-  onLoginResult: (cb) => ipcRenderer.on('bot:login_result', (_event, msg) => cb(msg)),
-
-  // Login status check
-  checkLogin: () => ipcRenderer.invoke('bot:check_login'),
-  onLoginStatus: (cb) => ipcRenderer.on('bot:login_status', (_event, msg) => cb(msg)),
-
   // AI prompt generation
   generatePrompts: (chatLog) => ipcRenderer.invoke('prompts:generate', chatLog),
   onGeneratePromptsResult: (cb) => ipcRenderer.on('bot:generate_prompts_result', (_event, msg) => cb(msg)),

@@ -6,9 +6,6 @@ export const useBotStore = defineStore('bot', () => {
   const logs = ref([])
   const MAX_LOGS = 500
 
-  const loginStatus = ref('unknown') // 'unknown' | 'checking' | 'logged_in' | 'logged_out'
-  const loginUsername = ref('')
-
   function setRunning(val) {
     running.value = val
   }
@@ -27,10 +24,5 @@ export const useBotStore = defineStore('bot', () => {
     logs.value = []
   }
 
-  function setLoginStatus(status, username = '') {
-    loginStatus.value = status
-    loginUsername.value = username
-  }
-
-  return { running, logs, loginStatus, loginUsername, setLoginStatus, setRunning, addLog, clearLogs }
+  return { running, logs, setRunning, addLog, clearLogs }
 })

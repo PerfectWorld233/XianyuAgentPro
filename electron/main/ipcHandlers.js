@@ -63,14 +63,6 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     sendCommand({ cmd: 'stop' })
   })
 
-  ipcMain.handle('bot:login', () => {
-    sendCommand({ cmd: 'login' })
-  })
-
-  ipcMain.handle('bot:check_login', () => {
-    sendCommand({ cmd: 'check_login' })
-  })
-
   ipcMain.handle('shell:open_url', (_event, url) => {
     shell.openExternal(url)
   })

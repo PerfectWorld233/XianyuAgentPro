@@ -40,26 +40,6 @@ import { onMounted, onUnmounted } from 'vue'
 import { useBotStore } from './stores/botStore'
 
 const botStore = useBotStore()
-let loginCheckTimer = null
-let loginCheckSeq = 0  // 序列号，用于丢弃超时后到达的过期响应
-
-async function triggerLoginCheck() {
-  const seq = ++loginCheckSeq
-  botStore.setLoginStatus('checking')
-  try {
-    await Promise.race([
-      window.electronAPI.checkLogin(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
-    ])
-    // IPC invoke 本身成功（Python 已收到命令），等待 onLoginStatus 回调返回结果
-  } catch {
-    // 超时：Python 未响应，设回 unknown
-    console.warn('[LoginCheck] 登录状态检查超时（Python 未响应）')
-    if (seq === loginCheckSeq) {
-      botStore.setLoginStatus('unknown')
-    }
-  }
-}
 
 onMounted(() => {
   window.electronAPI.onBotStatus((msg) => {
@@ -71,23 +51,12 @@ onMounted(() => {
   window.electronAPI.onBotError((msg) => {
     botStore.addLog({ ...msg, level: 'error' })
   })
-  window.electronAPI.onLoginStatus((msg) => {
-    // 无论序列号如何，最新到达的 login_status 事件始终生效
-    botStore.setLoginStatus(msg.logged_in ? 'logged_in' : 'logged_out', msg.username || '')
-  })
-
-  // 启动时检查登录状态
-  triggerLoginCheck()
-  // 每小时轮询
-  loginCheckTimer = setInterval(triggerLoginCheck, 3600000)
 })
 
 onUnmounted(() => {
   window.electronAPI.removeAllListeners('bot:status')
   window.electronAPI.removeAllListeners('bot:log')
   window.electronAPI.removeAllListeners('bot:error')
-  window.electronAPI.removeAllListeners('bot:login_status')
-  if (loginCheckTimer) clearInterval(loginCheckTimer)
 })
 </script>
 

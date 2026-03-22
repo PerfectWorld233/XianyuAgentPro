@@ -1,22 +1,5 @@
 <template>
   <div class="page">
-    <!-- 登录状态横幅 -->
-    <div v-if="botStore.loginStatus === 'checking'" class="login-banner banner-checking">
-      正在检测闲鱼登录状态…
-    </div>
-    <div v-else-if="botStore.loginStatus === 'logged_out'" class="login-banner banner-warn">
-      未检测到闲鱼登录，请先扫码登录才能启动机器人。
-      <button
-        class="btn btn-login banner-login-btn"
-        :disabled="loginState === 'pending'"
-        @click="doLogin"
-      >
-        {{ loginState === 'pending' ? '登录中…' : '立即扫码登录' }}
-      </button>
-    </div>
-    <div v-else-if="botStore.loginStatus === 'logged_in'" class="login-banner banner-ok">
-      闲鱼已登录
-    </div>
     <div class="page-header">
       <div class="header-left">
         <h1 class="page-title">控制台</h1>
@@ -31,20 +14,11 @@
         </button>
         <button
           class="btn btn-quick-start"
-          :disabled="loginState === 'pending' || botStore.running"
+          :disabled="botStore.running"
           @click="quickStart"
         >
-          {{ loginState === 'pending' ? '登录中…' : '一键启动' }}
+          一键启动
         </button>
-        <button
-          class="btn btn-login"
-          :disabled="loginState === 'pending'"
-          @click="doLogin"
-        >
-          {{ loginState === 'pending' ? '登录中…' : '扫码登录' }}
-        </button>
-        <span v-if="loginState === 'success'" class="login-ok">✓ 登录成功</span>
-        <span v-if="loginState === 'failed'" class="login-err">✗ 登录失败，请重试</span>
         <button class="btn btn-secondary" @click="botStore.clearLogs">
           清空日志
         </button>
@@ -58,14 +32,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
 import { useBotStore } from '../stores/botStore'
 import StatusBadge from '../components/StatusBadge.vue'
 import LogViewer from '../components/LogViewer.vue'
 
 const botStore = useBotStore()
-const loginState = ref('idle') // 'idle' | 'pending' | 'success' | 'failed'
-const autoStartAfterLogin = ref(false)
+
+const XIANYU_IM_URL = 'https://www.goofish.com/im'
 
 async function startBot() {
   await window.electronAPI.botStart()
@@ -75,46 +48,10 @@ async function stopBot() {
   await window.electronAPI.botStop()
 }
 
-async function doLogin() {
-  loginState.value = 'pending'
-  await window.electronAPI.botLogin()
-}
-
-const XIANYU_IM_URL = 'https://www.goofish.com/im'
-
-// 一键启动：打开浏览器到闲鱼消息列表，并启动机器人监听回复
 async function quickStart() {
-  if (botStore.loginStatus === 'logged_in') {
-    window.electronAPI.openUrl(XIANYU_IM_URL)
-    await window.electronAPI.botStart()
-  } else {
-    autoStartAfterLogin.value = true
-    await doLogin()
-  }
+  window.electronAPI.openUrl(XIANYU_IM_URL)
+  await window.electronAPI.botStart()
 }
-
-onMounted(() => {
-  window.electronAPI.onLoginResult((msg) => {
-    if (msg.success) {
-      loginState.value = 'success'
-      // 登录成功后重新触发登录状态检查
-      botStore.setLoginStatus('checking')
-      window.electronAPI.checkLogin()
-      // 若是通过一键启动触发的登录，登录成功后自动打开消息页并启动机器人
-      if (autoStartAfterLogin.value) {
-        autoStartAfterLogin.value = false
-        window.electronAPI.openUrl(XIANYU_IM_URL)
-        window.electronAPI.botStart()
-      }
-    } else {
-      loginState.value = 'failed'
-      autoStartAfterLogin.value = false
-    }
-    setTimeout(() => {
-      loginState.value = 'idle'
-    }, 3000)
-  })
-})
 </script>
 
 <style scoped>
@@ -199,68 +136,10 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.btn-login {
-  background: #a6e3a1;
-  color: #1e2030;
-}
-
-.btn-login:not(:disabled):hover {
-  background: #8fd68a;
-}
-
-.btn-login:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.login-ok {
-  font-size: 13px;
-  color: #40a02b;
-  font-weight: 500;
-}
-
-.login-err {
-  font-size: 13px;
-  color: #d20f39;
-  font-weight: 500;
-}
-
 .log-area {
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.login-banner {
-  padding: 10px 18px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.banner-checking {
-  background: #e2e8f0;
-  color: #64748b;
-}
-
-.banner-warn {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
-}
-
-.banner-ok {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.banner-login-btn {
-  padding: 5px 14px;
-  font-size: 12px;
 }
 </style>

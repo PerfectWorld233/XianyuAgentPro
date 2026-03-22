@@ -96,7 +96,6 @@ npm run dev
 │   ├── XianyuApis.py       # HTTP API wrapper for platform
 │   ├── context_manager.py  # SQLite conversation storage
 │   ├── config_manager.py   # SQLite config & prompts manager
-│   ├── login_browser.py    # Pure-CDP QR code login (Chrome/Edge via aiohttp + websockets)
 │   ├── utils/
 │   │   └── xianyu_utils.py # Utility functions (cookies, signatures, crypto)
 │   └── requirements.txt
@@ -132,7 +131,7 @@ Messages are validated before processing:
 
 ## Common Issues & Solutions
 
-**Token Expiration**: Use the "扫码登录" button in the UI to refresh cookies automatically, or update `COOKIES_STR` in Settings.
+**Token Expiration**: Update `COOKIES_STR` manually in Settings page. Open [goofish.com](https://www.goofish.com) in Chrome, copy cookies from DevTools, paste into Settings.
 
 **WebSocket Disconnects**: Automatic reconnection triggers on token refresh. Check logs for "Token刷新成功" messages.
 
@@ -147,7 +146,6 @@ Messages are validated before processing:
 - `websockets` - WebSocket connection handling
 - `loguru` - Structured logging
 - `requests` - HTTP requests for API calls
-- `aiohttp` - HTTP client for CDP browser control (QR code login)
 
 ### Node.js (`electron/package.json`)
 - `electron` - Desktop app framework

@@ -7,16 +7,12 @@ Outbound message types:
   {"type": "log",                    "level": "info|debug|warning|error", "message": "...", "time": "ISO"}
   {"type": "status",                 "running": true|false}
   {"type": "error",                  "code": "...", "message": "..."}
-  {"type": "login_result",           "success": true|false, "message": "..."}
-  {"type": "login_status",           "logged_in": true|false, "username": ""}
   {"type": "generate_prompts_result","success": true|false, "prompts": {...}, "message": "..."}
 
 Inbound commands:
   {"cmd": "start"}
   {"cmd": "stop"}
   {"cmd": "reload_config"}
-  {"cmd": "login"}
-  {"cmd": "check_login"}
   {"cmd": "generate_prompts", "chat_log": "..."}
 """
 
@@ -84,18 +80,6 @@ def emit_error(code: str, message: str):
     sys.stdout.flush()
 
 
-def emit_login_result(success: bool, message: str):
-    payload = {"type": "login_result", "success": success, "message": message}
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
-
-
-def emit_login_status(logged_in: bool, username: str = ""):
-    payload = {"type": "login_status", "logged_in": logged_in, "username": username}
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
-
-
 def emit_generate_prompts_result(success: bool, prompts: dict = None, message: str = ""):
     payload = {
         "type": "generate_prompts_result",
@@ -133,9 +117,7 @@ class BridgeManager:
         self.chat_db_path = os.path.join(data_dir, 'chat_history.db')
         self.config_manager = None
         self.bot_task: asyncio.Task = None
-        self.login_task: asyncio.Task = None
         self.generate_task: asyncio.Task = None
-        self.check_login_task: asyncio.Task = None
 
     def load_modules(self):
         """Import project modules (supports both source and PyInstaller bundle)."""
@@ -222,23 +204,6 @@ class BridgeManager:
         emit_status(False)
         logger.info("机器人已停止")
 
-    async def handle_login(self):
-        logger.info("正在启动浏览器登录，请在弹出的浏览器窗口中扫码…")
-        try:
-            from login_browser import browser_login
-            success = await browser_login(self.config_manager)
-        except Exception as e:
-            logger.error(f"浏览器登录异常: {e}")
-            emit_login_result(False, f"登录异常: {e}")
-            return
-
-        if success:
-            logger.info("扫码登录成功，Cookie 已保存")
-            emit_login_result(True, "登录成功，Cookie 已自动保存")
-        else:
-            logger.warning("扫码登录超时或失败，请重试")
-            emit_login_result(False, "登录超时或失败，请重试")
-
     async def handle_generate_prompts(self, chat_log: str):
         logger.info("正在调用 AI 分析聊天记录，生成提示词…")
         try:
@@ -296,19 +261,6 @@ class BridgeManager:
             logger.error(f"AI 提示词生成失败: {e}")
             emit_generate_prompts_result(False, message=str(e))
 
-    async def handle_check_login(self):
-        try:
-            from XianyuApis import XianyuApis
-            cookies_str = self.config_manager.get_value("COOKIES_STR", "")
-            # config_manager=None 的临时实例：hasLogin() 内的 update_env_cookies 会打印警告但不影响功能
-            ok, username = await asyncio.get_event_loop().run_in_executor(
-                None, XianyuApis.check_login_status, cookies_str
-            )
-            emit_login_status(ok, username)
-        except Exception as e:
-            logger.warning(f"check_login 异常: {e}")
-            emit_login_status(False, "")
-
     async def run(self):
         loop = asyncio.get_running_loop()
         cmd_queue: asyncio.Queue = asyncio.Queue()
@@ -364,12 +316,6 @@ class BridgeManager:
                 if was_running:
                     start_task = asyncio.create_task(self.start_bot())
 
-            elif action == "login":
-                if not self.login_task or self.login_task.done():
-                    self.login_task = asyncio.create_task(self.handle_login())
-                else:
-                    logger.warning("登录已在进行中，忽略重复请求")
-
             elif action == "generate_prompts":
                 chat_log = cmd.get("chat_log", "")
                 if not chat_log.strip():
@@ -380,12 +326,6 @@ class BridgeManager:
                     )
                 else:
                     logger.warning("AI 生成已在进行中，忽略重复请求")
-
-            elif action == "check_login":
-                if not self.check_login_task or self.check_login_task.done():
-                    self.check_login_task = asyncio.create_task(self.handle_check_login())
-                else:
-                    logger.debug("登录状态检查中，忽略重复请求")
 
             else:
                 logger.warning(f"未知命令: {action}")
