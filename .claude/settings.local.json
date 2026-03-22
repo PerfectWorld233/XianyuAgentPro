@@ -22,7 +22,10 @@
       "Bash(pip index:*)",
       "Bash(gh repo:*)",
       "Bash(rm main.py XianyuAgent.py XianyuApis.py context_manager.py requirements.txt .env.example)",
-      "Bash(rm -rf utils/ __pycache__/)"
+      "Bash(rm -rf utils/ __pycache__/)",
+      "Bash(node -e \":*)",
+      "Bash(taskkill /F /IM electron.exe)",
+      "Bash(taskkill /F /IM node.exe)"
     ]
   }
 }

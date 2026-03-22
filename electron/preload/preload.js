@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Prompts
   getPrompts: () => ipcRenderer.invoke('prompts:get'),
   savePrompts: (data) => ipcRenderer.invoke('prompts:save', data),
+  getDefaultPrompts: () => ipcRenderer.invoke('prompts:get_defaults'),
 
   // Login (QR code browser flow)
   botLogin: () => ipcRenderer.invoke('bot:login'),
@@ -32,4 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AI prompt generation
   generatePrompts: (chatLog) => ipcRenderer.invoke('prompts:generate', chatLog),
   onGeneratePromptsResult: (cb) => ipcRenderer.on('bot:generate_prompts_result', (_event, msg) => cb(msg)),
+
+  // Open URL in system browser
+  openUrl: (url) => ipcRenderer.invoke('shell:open_url', url),
 })

@@ -349,8 +349,9 @@ class BridgeManager:
 
             elif action == "reload_config":
                 logger.info("收到 reload_config 指令，重新加载配置...")
+                was_running = start_task and not start_task.done()
                 # Stop first
-                if start_task and not start_task.done():
+                if was_running:
                     start_task.cancel()
                     try:
                         await asyncio.wait_for(asyncio.shield(start_task), timeout=6.0)
@@ -358,9 +359,10 @@ class BridgeManager:
                         pass
                 await self.stop_bot()
                 start_task = None
-                # Reload config from DB and restart
+                # Reload config from DB, restart only if was running before
                 self.init_config()
-                start_task = asyncio.create_task(self.start_bot())
+                if was_running:
+                    start_task = asyncio.create_task(self.start_bot())
 
             elif action == "login":
                 if not self.login_task or self.login_task.done():

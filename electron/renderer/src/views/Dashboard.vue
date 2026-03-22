@@ -30,6 +30,13 @@
           启动
         </button>
         <button
+          class="btn btn-quick-start"
+          :disabled="loginState === 'pending' || botStore.running"
+          @click="quickStart"
+        >
+          {{ loginState === 'pending' ? '登录中…' : '一键启动' }}
+        </button>
+        <button
           class="btn btn-login"
           :disabled="loginState === 'pending'"
           @click="doLogin"
@@ -58,6 +65,7 @@ import LogViewer from '../components/LogViewer.vue'
 
 const botStore = useBotStore()
 const loginState = ref('idle') // 'idle' | 'pending' | 'success' | 'failed'
+const autoStartAfterLogin = ref(false)
 
 async function startBot() {
   await window.electronAPI.botStart()
@@ -72,6 +80,19 @@ async function doLogin() {
   await window.electronAPI.botLogin()
 }
 
+const XIANYU_IM_URL = 'https://www.goofish.com/im'
+
+// 一键启动：打开浏览器到闲鱼消息列表，并启动机器人监听回复
+async function quickStart() {
+  if (botStore.loginStatus === 'logged_in') {
+    window.electronAPI.openUrl(XIANYU_IM_URL)
+    await window.electronAPI.botStart()
+  } else {
+    autoStartAfterLogin.value = true
+    await doLogin()
+  }
+}
+
 onMounted(() => {
   window.electronAPI.onLoginResult((msg) => {
     if (msg.success) {
@@ -79,8 +100,15 @@ onMounted(() => {
       // 登录成功后重新触发登录状态检查
       botStore.setLoginStatus('checking')
       window.electronAPI.checkLogin()
+      // 若是通过一键启动触发的登录，登录成功后自动打开消息页并启动机器人
+      if (autoStartAfterLogin.value) {
+        autoStartAfterLogin.value = false
+        window.electronAPI.openUrl(XIANYU_IM_URL)
+        window.electronAPI.botStart()
+      }
     } else {
       loginState.value = 'failed'
+      autoStartAfterLogin.value = false
     }
     setTimeout(() => {
       loginState.value = 'idle'
@@ -154,6 +182,21 @@ onMounted(() => {
 
 .btn-secondary:hover {
   background: #cbd5e1;
+}
+
+.btn-quick-start {
+  background: #f9a825;
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-quick-start:not(:disabled):hover {
+  background: #e69500;
+}
+
+.btn-quick-start:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-login {

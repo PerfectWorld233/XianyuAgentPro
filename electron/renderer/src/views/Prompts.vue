@@ -60,14 +60,13 @@
             :placeholder="`在此输入 ${tab.label} 提示词...`"
             spellcheck="false"
           />
+          <div class="form-actions">
+            <button class="btn btn-primary" :disabled="savingKey === tab.key" @click="save(tab.key)">
+              {{ savingKey === tab.key ? '保存中...' : `保存${tab.label}` }}
+            </button>
+            <span v-if="savedKey === tab.key" class="save-ok">✓ 已保存</span>
+          </div>
         </div>
-      </div>
-
-      <div class="form-actions">
-        <button class="btn btn-primary" :disabled="saving" @click="save">
-          {{ saving ? '保存中...' : '保存提示词' }}
-        </button>
-        <span v-if="saved" class="save-ok">✓ 已保存，机器人将自动重载</span>
       </div>
     </div>
 
@@ -89,17 +88,20 @@ const activeTab = ref('classify_prompt')
 const form = ref({})
 const defaults = ref({})
 const loaded = ref(false)
-const saving = ref(false)
-const saved = ref(false)
+const savingKey = ref('')   // 当前正在保存的 tab key
+const savedKey = ref('')    // 最近保存成功的 tab key
 const chatLog = ref('')
 const generating = ref(false)
 const generateError = ref('')
 const showAiPanel = ref(false)
 
 onMounted(async () => {
-  form.value = await window.electronAPI.getPrompts()
-  // Store originals as soft defaults (before any edits this session)
-  defaults.value = { ...form.value }
+  const [prompts, defaultPrompts] = await Promise.all([
+    window.electronAPI.getPrompts(),
+    window.electronAPI.getDefaultPrompts(),
+  ])
+  form.value = prompts
+  defaults.value = defaultPrompts
   window.electronAPI.onGeneratePromptsResult((msg) => {
     generating.value = false
     if (msg.success) {
@@ -125,16 +127,15 @@ async function generatePrompts() {
   await window.electronAPI.generatePrompts(chatLog.value)
 }
 
-async function save() {
-  saving.value = true
-  saved.value = false
+async function save(key) {
+  savingKey.value = key
+  savedKey.value = ''
   try {
-    await window.electronAPI.savePrompts(form.value)
-    saved.value = true
-    defaults.value = { ...form.value }
-    setTimeout(() => { saved.value = false }, 3000)
+    await window.electronAPI.savePrompts({ [key]: form.value[key] })
+    savedKey.value = key
+    setTimeout(() => { savedKey.value = '' }, 3000)
   } finally {
-    saving.value = false
+    savingKey.value = ''
   }
 }
 </script>
@@ -205,6 +206,7 @@ async function save() {
   flex-direction: column;
   height: 100%;
   gap: 6px;
+  overflow: hidden;
 }
 
 .editor-toolbar {
