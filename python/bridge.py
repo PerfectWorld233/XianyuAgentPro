@@ -339,9 +339,22 @@ def main():
     # Set BRIDGE_MODE env so downstream code knows it's running under Electron
     os.environ['BRIDGE_MODE'] = '1'
 
-    # Setup loguru: remove default stderr handler, add JSON stdout sink
+    # Setup loguru: remove default stderr handler, add JSON stdout sink + file sink
     logger.remove()
     logger.add(stdout_json_sink, level="DEBUG")
+
+    # File sink: rotate daily, keep 7 days, UTF-8, stored in %APPDATA%\XianyuAutoAgent\logs\
+    log_dir = os.path.join(get_data_dir(), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    logger.add(
+        os.path.join(log_dir, '{time:YYYY-MM-DD}.log'),
+        level="DEBUG",
+        encoding="utf-8",
+        rotation="00:00",       # new file each day at midnight
+        retention="7 days",     # keep logs for 7 days
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
+        enqueue=True,           # thread-safe async write
+    )
 
     data_dir = get_data_dir()
     manager = BridgeManager(data_dir)
