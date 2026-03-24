@@ -111,17 +111,25 @@ async def _wait_for_cdp(retries: int = 30, interval: float = 1.0) -> str:
     )
 
 
-async def _open_new_tab() -> str:
-    """Open a new tab via CDP HTTP and return its webSocketDebuggerUrl."""
-    # Run blocking urllib call in executor to avoid blocking event loop
-    loop = asyncio.get_running_loop()
-    target = await loop.run_in_executor(
-        None, lambda: _cdp_http_get(f"/json/new?{XIANYU_URL}")
-    )
+def _open_new_tab_http() -> str:
+    """
+    Open a new tab via CDP HTTP PUT /json/new and return its webSocketDebuggerUrl.
+    Chrome 112+ requires PUT (not GET) for this endpoint.
+    """
+    url = f"{CDP_BASE}/json/new?{XIANYU_URL}"
+    req = urllib.request.Request(url, method="PUT")
+    with urllib.request.urlopen(req, timeout=5.0) as resp:
+        target = json.loads(resp.read().decode())
     ws_url = target.get("webSocketDebuggerUrl")
     if not ws_url:
         raise RuntimeError("新标签页没有返回 webSocketDebuggerUrl")
     return ws_url
+
+
+async def _open_new_tab() -> str:
+    """Open a new tab via CDP HTTP PUT, return its webSocketDebuggerUrl."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _open_new_tab_http)
 
 
 async def _cdp_call(ws, method: str, params: dict = None, msg_id: int = 1) -> dict:
