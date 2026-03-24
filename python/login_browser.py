@@ -207,7 +207,7 @@ async def browser_login(config_manager) -> bool:
             poll_interval = 2
             elapsed = 0
 
-            while elapsed < max_wait:
+            while elapsed <= max_wait - poll_interval:
                 await asyncio.sleep(poll_interval)
                 elapsed += poll_interval
 
@@ -226,6 +226,7 @@ async def browser_login(config_manager) -> bool:
                     config_manager.update_cookies(cookie_str)
                     logger.info("Cookie 已保存，跳转到消息列表页")
                     await _cdp_call(ws, "Page.navigate", {"url": XIANYU_IM_URL}, msg_id=msg_id)
+                    msg_id += 1
                     return True
 
             logger.warning("等待扫码超时（120 秒），请重新启动后再试")
