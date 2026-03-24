@@ -1,4 +1,4 @@
-"""
+r"""
 login_browser.py — CDP-based browser login for Xianyu.
 
 Connects to the user's real Chrome/Edge browser via Chrome DevTools Protocol
