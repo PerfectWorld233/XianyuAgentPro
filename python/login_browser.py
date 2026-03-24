@@ -122,3 +122,32 @@ async def _open_new_tab() -> str:
     if not ws_url:
         raise RuntimeError("新标签页没有返回 webSocketDebuggerUrl")
     return ws_url
+
+
+async def _cdp_call(ws, method: str, params: dict = None, msg_id: int = 1) -> dict:
+    """Send a CDP command over WebSocket and wait for its matching response."""
+    payload = {"id": msg_id, "method": method, "params": params or {}}
+    await ws.send(json.dumps(payload))
+    while True:
+        raw = await ws.recv()
+        msg = json.loads(raw)
+        if msg.get("id") == msg_id:
+            return msg.get("result", {})
+
+
+async def _get_all_cookies(ws, msg_id_start: int = 10) -> list:
+    """Retrieve all browser cookies via CDP Network.getAllCookies."""
+    result = await _cdp_call(ws, "Network.getAllCookies", msg_id=msg_id_start)
+    return result.get("cookies", [])
+
+
+def _extract_cookie_str(cookies: list) -> str:
+    """
+    Filter cookies to relevant domains and format as 'key=value; ...' string.
+    Relevant domains: goofish.com, taobao.com, alipay.com
+    """
+    relevant = [
+        c for c in cookies
+        if any(d in c.get("domain", "") for d in COOKIE_DOMAINS)
+    ]
+    return "; ".join(f"{c['name']}={c['value']}" for c in relevant)
