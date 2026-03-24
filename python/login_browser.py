@@ -151,3 +151,86 @@ def _extract_cookie_str(cookies: list) -> str:
         if any(d in c.get("domain", "") for d in COOKIE_DOMAINS)
     ]
     return "; ".join(f"{c['name']}={c['value']}" for c in relevant)
+
+
+async def browser_login(config_manager) -> bool:
+    """
+    Connect to (or launch) the user's real Chrome/Edge via CDP,
+    wait for the user to scan the Xianyu QR code, extract and persist cookies.
+
+    Returns True on success, False on timeout or unrecoverable error.
+    """
+    profile_dir = _get_profile_dir()
+
+    # --- 1. Ensure browser is running with debug port open ---
+    if _is_port_open(REMOTE_DEBUGGING_PORT):
+        # Port already occupied — check if it's a responsive CDP server
+        try:
+            _cdp_http_get("/json", timeout=2.0)
+            logger.debug(f"端口 {REMOTE_DEBUGGING_PORT} 已有响应的浏览器，直接复用")
+        except Exception:
+            logger.error(
+                f"端口 {REMOTE_DEBUGGING_PORT} 已被占用但 CDP 无响应。"
+                "请手动关闭占用该端口的程序后重试。"
+            )
+            return False
+    else:
+        try:
+            exe = _find_browser()
+        except RuntimeError as e:
+            logger.error(str(e))
+            return False
+        _launch_browser(exe, profile_dir, REMOTE_DEBUGGING_PORT)
+        # Give browser a moment before we start polling
+        await asyncio.sleep(2)
+
+    # --- 2. Wait for CDP to become ready, open a fresh controlled tab ---
+    try:
+        await _wait_for_cdp(retries=30, interval=1.0)
+        new_tab_ws_url = await _open_new_tab()
+    except RuntimeError as e:
+        logger.error(str(e))
+        return False
+
+    # --- 3. Connect WS, navigate to Xianyu, poll for login ---
+    try:
+        import websockets  # already in requirements.txt
+
+        async with websockets.connect(new_tab_ws_url) as ws:
+            msg_id = 1
+
+            await _cdp_call(ws, "Network.enable", msg_id=msg_id); msg_id += 1
+            await _cdp_call(ws, "Page.navigate", {"url": XIANYU_URL}, msg_id=msg_id); msg_id += 1
+            logger.info("已打开闲鱼首页，请在浏览器中扫码登录（最多等待 120 秒）…")
+
+            max_wait = 120
+            poll_interval = 2
+            elapsed = 0
+
+            while elapsed < max_wait:
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
+
+                cookies = await _get_all_cookies(ws, msg_id_start=msg_id)
+                msg_id += 1
+
+                unb = next(
+                    (c for c in cookies
+                     if c.get("name") == "unb" and c.get("value")
+                     and any(d in c.get("domain", "") for d in COOKIE_DOMAINS)),
+                    None,
+                )
+
+                if unb:
+                    cookie_str = _extract_cookie_str(cookies)
+                    config_manager.update_cookies(cookie_str)
+                    logger.info("Cookie 已保存，跳转到消息列表页")
+                    await _cdp_call(ws, "Page.navigate", {"url": XIANYU_IM_URL}, msg_id=msg_id)
+                    return True
+
+            logger.warning("等待扫码超时（120 秒），请重新启动后再试")
+            return False
+
+    except Exception as e:
+        logger.error(f"CDP 登录异常: {e}")
+        return False
