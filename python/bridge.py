@@ -168,6 +168,21 @@ class BridgeManager:
 
         try:
             logger.info("正在启动机器人...")
+
+            # --- Cookie validity check before starting ---
+            from XianyuApis import XianyuApis
+            from login_browser import browser_login
+            cookies_str = self.config_manager.get_value("COOKIES_STR", "")
+            ok, _ = XianyuApis.check_login_status(cookies_str)
+            if not ok:
+                logger.info("Cookie 无效或已过期，启动 CDP 浏览器登录…")
+                success = await browser_login(self.config_manager)
+                if not success:
+                    logger.error("CDP 登录失败，机器人未启动。请重试。")
+                    emit_status(False)
+                    return
+                logger.info("CDP 登录成功，继续启动机器人")
+
             live = self.build_live_instance()
             self.bot_task = asyncio.create_task(live.main())
             emit_status(True)
