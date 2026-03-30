@@ -1,4 +1,4 @@
-const { ipcMain, shell, dialog } = require('electron')
+const { shell, dialog } = require('electron')
 const {
   getConfig, saveConfig,
   getPrompts, savePrompts,
@@ -113,15 +113,15 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   })
 
   ipcMain.handle('knowledge:update', (_event, { id, question, answer }) => {
-    updateKnowledge({ id, question, answer })
-    sendCommand({ cmd: 'knowledge:rebuild_index' })
-    return { ok: true }
+    const changes = updateKnowledge({ id, question, answer })
+    if (changes) sendCommand({ cmd: 'knowledge:rebuild_index' })
+    return { ok: changes > 0 }
   })
 
   ipcMain.handle('knowledge:delete', (_event, { id }) => {
-    deleteKnowledge(id)
-    sendCommand({ cmd: 'knowledge:rebuild_index' })
-    return { ok: true }
+    const changes = deleteKnowledge(id)
+    if (changes) sendCommand({ cmd: 'knowledge:rebuild_index' })
+    return { ok: changes > 0 }
   })
 
   ipcMain.handle('knowledge:batchAdd', (_event, { entries, itemId }) => {
@@ -132,7 +132,7 @@ function registerIpcHandlers(ipcMain, mainWindow) {
 
   // AI generation handlers (fire-and-forget to Python, result comes back as broadcast event)
   ipcMain.handle('knowledge:generateFromImage', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'],
       filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }],
     })
