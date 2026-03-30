@@ -18,6 +18,17 @@ function initDbManager(dataDir) {
       content TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    PRAGMA journal_mode=WAL;
+    CREATE TABLE IF NOT EXISTS knowledge (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id     TEXT,
+      question    TEXT NOT NULL,
+      answer      TEXT NOT NULL,
+      embedding   BLOB,
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_knowledge_item_id ON knowledge(item_id);
   `)
 }
 
@@ -65,4 +76,52 @@ function savePrompts(data) {
   run(Object.entries(data))
 }
 
-module.exports = { initDbManager, getConfig, saveConfig, getPrompts, savePrompts }
+function listKnowledge(itemId) {
+  if (itemId !== undefined && itemId !== null) {
+    return db.prepare('SELECT id, item_id, question, answer, created_at, updated_at FROM knowledge WHERE item_id = ? ORDER BY id DESC').all(itemId)
+  }
+  return db.prepare('SELECT id, item_id, question, answer, created_at, updated_at FROM knowledge ORDER BY id DESC').all()
+}
+
+function addKnowledge({ question, answer, itemId }) {
+  const stmt = db.prepare(
+    "INSERT INTO knowledge (item_id, question, answer) VALUES (?, ?, ?)"
+  )
+  const result = stmt.run(itemId ?? null, question, answer)
+  return { id: result.lastInsertRowid }
+}
+
+function updateKnowledge({ id, question, answer }) {
+  db.prepare(
+    "UPDATE knowledge SET question = ?, answer = ?, embedding = NULL, updated_at = datetime('now') WHERE id = ?"
+  ).run(question, answer, id)
+}
+
+function deleteKnowledge(id) {
+  db.prepare('DELETE FROM knowledge WHERE id = ?').run(id)
+}
+
+function batchAddKnowledge(entries, itemId) {
+  const stmt = db.prepare(
+    "INSERT INTO knowledge (item_id, question, answer) VALUES (?, ?, ?)"
+  )
+  const run = db.transaction((items) => {
+    for (const { question, answer } of items) {
+      stmt.run(itemId ?? null, question, answer)
+    }
+  })
+  run(entries)
+}
+
+module.exports = {
+  initDbManager,
+  getConfig,
+  saveConfig,
+  getPrompts,
+  savePrompts,
+  listKnowledge,
+  addKnowledge,
+  updateKnowledge,
+  deleteKnowledge,
+  batchAddKnowledge,
+}
