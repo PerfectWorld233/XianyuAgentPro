@@ -26,6 +26,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generatePrompts: (chatLog) => ipcRenderer.invoke('prompts:generate', chatLog),
   onGeneratePromptsResult: (cb) => ipcRenderer.on('bot:generate_prompts_result', (_event, msg) => cb(msg)),
 
+  // Knowledge base
+  listKnowledge: (opts) => ipcRenderer.invoke('knowledge:list', opts),
+  addKnowledge: (data) => ipcRenderer.invoke('knowledge:add', data),
+  updateKnowledge: (data) => ipcRenderer.invoke('knowledge:update', data),
+  deleteKnowledge: (data) => ipcRenderer.invoke('knowledge:delete', data),
+  batchAddKnowledge: (data) => ipcRenderer.invoke('knowledge:batchAdd', data),
+  generateFromImage: () => ipcRenderer.invoke('knowledge:generateFromImage'),
+  generateFromChat: (data) => ipcRenderer.invoke('knowledge:generateFromChat', data),
+  onKnowledgeGenerateResult: (cb) => ipcRenderer.on('bot:knowledge_generate_result', (_e, msg) => cb(msg)),
+  onKnowledgeGenerateError: (cb) => ipcRenderer.on('bot:knowledge_generate_error', (_e, msg) => cb(msg)),
+  // Clean up both knowledge event listeners (called in KnowledgeBase.vue onUnmounted)
+  removeAllKnowledgeListeners: () => {
+    ipcRenderer.removeAllListeners('bot:knowledge_generate_result')
+    ipcRenderer.removeAllListeners('bot:knowledge_generate_error')
+  },
+
   // Open URL in system browser
   openUrl: (url) => ipcRenderer.invoke('shell:open_url', url),
 })
