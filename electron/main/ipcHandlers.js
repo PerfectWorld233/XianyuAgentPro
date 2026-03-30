@@ -1,5 +1,9 @@
-const { shell } = require('electron')
-const { getConfig, saveConfig, getPrompts, savePrompts } = require('./dbManager')
+const { ipcMain, shell, dialog } = require('electron')
+const {
+  getConfig, saveConfig,
+  getPrompts, savePrompts,
+  listKnowledge, addKnowledge, updateKnowledge, deleteKnowledge, batchAddKnowledge,
+} = require('./dbManager')
 const { sendCommand } = require('./pythonManager')
 
 const DEFAULT_PROMPTS = {
@@ -94,6 +98,51 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   ipcMain.handle('prompts:save', (_event, data) => {
     savePrompts(data)
     sendCommand({ cmd: 'reload_config' })
+    return { ok: true }
+  })
+
+  // Knowledge CRUD (direct SQLite, no Python IPC needed)
+  ipcMain.handle('knowledge:list', (_event, { itemId } = {}) => {
+    return listKnowledge(itemId)
+  })
+
+  ipcMain.handle('knowledge:add', (_event, { question, answer, itemId }) => {
+    const result = addKnowledge({ question, answer, itemId })
+    sendCommand({ cmd: 'knowledge:rebuild_index' })
+    return result
+  })
+
+  ipcMain.handle('knowledge:update', (_event, { id, question, answer }) => {
+    updateKnowledge({ id, question, answer })
+    sendCommand({ cmd: 'knowledge:rebuild_index' })
+    return { ok: true }
+  })
+
+  ipcMain.handle('knowledge:delete', (_event, { id }) => {
+    deleteKnowledge(id)
+    sendCommand({ cmd: 'knowledge:rebuild_index' })
+    return { ok: true }
+  })
+
+  ipcMain.handle('knowledge:batchAdd', (_event, { entries, itemId }) => {
+    batchAddKnowledge(entries, itemId)
+    sendCommand({ cmd: 'knowledge:rebuild_index' })
+    return { ok: true }
+  })
+
+  // AI generation handlers (fire-and-forget to Python, result comes back as broadcast event)
+  ipcMain.handle('knowledge:generateFromImage', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }],
+    })
+    if (canceled || filePaths.length === 0) return { canceled: true }
+    sendCommand({ cmd: 'knowledge:generate_from_image', image_path: filePaths[0] })
+    return { ok: true }
+  })
+
+  ipcMain.handle('knowledge:generateFromChat', (_event, { chatText }) => {
+    sendCommand({ cmd: 'knowledge:generate_from_chat', chat_text: chatText })
     return { ok: true }
   })
 }
