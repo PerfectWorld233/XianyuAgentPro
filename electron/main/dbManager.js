@@ -77,7 +77,7 @@ function savePrompts(data) {
 }
 
 function listKnowledge(itemId) {
-  if (itemId !== undefined && itemId !== null) {
+  if (itemId) {
     return db.prepare('SELECT id, item_id, question, answer, created_at, updated_at FROM knowledge WHERE item_id = ? ORDER BY id DESC').all(itemId)
   }
   return db.prepare('SELECT id, item_id, question, answer, created_at, updated_at FROM knowledge ORDER BY id DESC').all()
@@ -106,11 +106,14 @@ function batchAddKnowledge(entries, itemId) {
     "INSERT INTO knowledge (item_id, question, answer) VALUES (?, ?, ?)"
   )
   const run = db.transaction((items) => {
+    const ids = []
     for (const { question, answer } of items) {
-      stmt.run(itemId ?? null, question, answer)
+      const result = stmt.run(itemId ?? null, question, answer)
+      ids.push({ id: result.lastInsertRowid })
     }
+    return ids
   })
-  run(entries)
+  return run(entries)
 }
 
 module.exports = {
