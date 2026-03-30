@@ -5,6 +5,7 @@ function initDbManager(dataDir) {
   const Database = require('better-sqlite3')
   const dbPath = path.join(dataDir, 'app_config.db')
   db = new Database(dbPath)
+  db.pragma('journal_mode = WAL')
 
   // Ensure tables exist (mirrors Python config_manager.py schema)
   db.exec(`
@@ -18,7 +19,6 @@ function initDbManager(dataDir) {
       content TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
-    PRAGMA journal_mode=WAL;
     CREATE TABLE IF NOT EXISTS knowledge (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       item_id     TEXT,
@@ -85,25 +85,27 @@ function listKnowledge(itemId) {
 
 function addKnowledge({ question, answer, itemId }) {
   const stmt = db.prepare(
-    "INSERT INTO knowledge (item_id, question, answer) VALUES (?, ?, ?)"
+    `INSERT INTO knowledge (item_id, question, answer) VALUES (?, ?, ?)`
   )
   const result = stmt.run(itemId ?? null, question, answer)
   return { id: result.lastInsertRowid }
 }
 
 function updateKnowledge({ id, question, answer }) {
-  db.prepare(
-    "UPDATE knowledge SET question = ?, answer = ?, embedding = NULL, updated_at = datetime('now') WHERE id = ?"
+  const result = db.prepare(
+    `UPDATE knowledge SET question = ?, answer = ?, embedding = NULL, updated_at = datetime('now') WHERE id = ?`
   ).run(question, answer, id)
+  return result.changes
 }
 
 function deleteKnowledge(id) {
-  db.prepare('DELETE FROM knowledge WHERE id = ?').run(id)
+  const result = db.prepare(`DELETE FROM knowledge WHERE id = ?`).run(id)
+  return result.changes
 }
 
 function batchAddKnowledge(entries, itemId) {
   const stmt = db.prepare(
-    "INSERT INTO knowledge (item_id, question, answer) VALUES (?, ?, ?)"
+    `INSERT INTO knowledge (item_id, question, answer) VALUES (?, ?, ?)`
   )
   const run = db.transaction((items) => {
     const ids = []
