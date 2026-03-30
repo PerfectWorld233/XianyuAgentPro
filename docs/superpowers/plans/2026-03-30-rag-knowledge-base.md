@@ -205,7 +205,17 @@ const {
 } = require('./dbManager')
 ```
 
-- [ ] **Step 2: 在 registerIpcHandlers 中注册 knowledge CRUD handlers**
+- [ ] **Step 2: 将 dialog 加入 electron 导入（先做，handler 依赖它）**
+
+打开 `electron/main/ipcHandlers.js`，找到文件顶部导入 `electron` 的行（当前只有 `ipcMain` 或 `ipcMain, shell`），**将 `dialog` 加入**：
+
+```javascript
+const { ipcMain, dialog } = require('electron')
+```
+
+> 必须在注册 handler 之前完成，`knowledge:generateFromImage` 调用了 `dialog.showOpenDialog()`，缺少导入会在运行时崩溃。
+
+- [ ] **Step 3: 在 registerIpcHandlers 中注册 knowledge CRUD handlers**
 
 在 `registerIpcHandlers` 函数内，`prompts` 相关 handler 之后追加：
 
@@ -256,19 +266,9 @@ const {
   })
 ```
 
-- [ ] **Step 3: 将 dialog 加入 electron 导入（必须执行）**
-
-打开 `electron/main/ipcHandlers.js`，找到文件顶部导入 `electron` 的行（当前只有 `ipcMain` 或 `ipcMain, shell`），**将 `dialog` 加入**：
-
-```javascript
-const { ipcMain, dialog } = require('electron')
-```
-
-> 这是强制步骤，不是可选确认。`knowledge:generateFromImage` handler 调用了 `dialog.showOpenDialog()`，若缺少此导入将在运行时崩溃。
-
 - [ ] **Step 4: 确认 pythonManager 的 sendCommand 已导入**
 
-检查文件顶部是否有 `const { sendCommand } = require('./pythonManager')`，若无则添加。
+`ipcHandlers.js` 顶部第 3 行已有 `const { sendCommand } = require('./pythonManager')`，确认存在即可，无需修改。
 
 - [ ] **Step 5: 提交**
 
@@ -729,6 +729,7 @@ git commit -m "feat: add KnowledgeManager and KnowledgeRetriever modules"
 ```python
 self.knowledge_task: asyncio.Task | None = None
 self.knowledge_manager: 'KnowledgeManager | None' = None
+self.knowledge_retriever: 'KnowledgeRetriever | None' = None
 ```
 
 - [ ] **Step 2: 在 `init_config`（或 bot 初始化）中实例化 KnowledgeManager，并注入 DB_PATH**
@@ -871,6 +872,8 @@ def generate_reply(self, user_msg: str, item_desc: str, context: List[Dict], kno
     detected_intent = self.router.detect(user_msg, item_desc, formatted_context)
 ```
 
+> 注意：知识库内容注入到 `formatted_context` 变量中，`BaseAgent._build_messages()` 会把它拼入系统消息（`f"...【你与客户对话历史】{context}..."`），最终效果与 spec 中 `system_prompt += "【相关知识库】..."` 相同——都出现在 LLM 的 system message 里。
+
 - [ ] **Step 2: 确认 List 导入**
 
 文件顶部已有 `from typing import List, Dict`，若无则添加。
@@ -993,18 +996,23 @@ git commit -m "feat: integrate KnowledgeRetriever into message processing loop"
 </li>
 ```
 
-- [ ] **Step 2: 在 router/index.js 追加 /knowledge 路由**
+- [ ] **Step 2: 在 router/index.js 顶部添加 import**
 
-找到 `routes` 数组，在末尾追加：
+打开 `electron/renderer/src/router/index.js`，在文件顶部与其他 `import` 语句并列（如 `import Dashboard from ...`、`import Settings from ...` 等），追加：
 
 ```javascript
 import KnowledgeBase from '../views/KnowledgeBase.vue'
+```
 
-// 在 routes 数组中追加：
+- [ ] **Step 3: 在 routes 数组末尾追加路由**
+
+找到 `routes` 数组，在最后一条路由之后追加（注意是在数组内，不是在 `import` 处）：
+
+```javascript
 { path: '/knowledge', component: KnowledgeBase },
 ```
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 4: 提交**
 
 ```bash
 git add electron/renderer/src/App.vue electron/renderer/src/router/index.js
