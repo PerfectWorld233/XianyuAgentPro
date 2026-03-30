@@ -34,8 +34,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   batchAddKnowledge: (data) => ipcRenderer.invoke('knowledge:batchAdd', data),
   generateFromImage: () => ipcRenderer.invoke('knowledge:generateFromImage'),
   generateFromChat: (data) => ipcRenderer.invoke('knowledge:generateFromChat', data),
-  onKnowledgeGenerateResult: (cb) => ipcRenderer.on('bot:knowledge_generate_result', (_e, msg) => cb(msg)),
-  onKnowledgeGenerateError: (cb) => ipcRenderer.on('bot:knowledge_generate_error', (_e, msg) => cb(msg)),
+  onKnowledgeGenerateResult: (cb) => ipcRenderer.on('bot:knowledge_generate_result', (_event, msg) => cb(msg)),
+  onKnowledgeGenerateError: (cb) => ipcRenderer.on('bot:knowledge_generate_error', (_event, msg) => cb(msg)),
   // Clean up both knowledge event listeners (called in KnowledgeBase.vue onUnmounted)
   removeAllKnowledgeListeners: () => {
     ipcRenderer.removeAllListeners('bot:knowledge_generate_result')
