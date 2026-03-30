@@ -3,3 +3,5 @@ websockets==13.1
 loguru==0.7.3
 requests==2.32.3
 pyinstaller>=6.3.0
+faiss-cpu
+numpy

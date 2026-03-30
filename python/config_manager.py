@@ -17,6 +17,10 @@ DEFAULT_CONFIG = {
     "TOKEN_RETRY_INTERVAL": "300",
     "MANUAL_MODE_TIMEOUT": "3600",
     "MESSAGE_EXPIRE_TIME": "300000",
+    "EMBEDDING_MODEL": "text-embedding-v3",
+    "KNOWLEDGE_TOP_K": "3",
+    "KNOWLEDGE_ENABLED": "True",
+    "VISION_MODEL": "",
 }
 
 PROMPT_NAMES = ["classify_prompt", "price_prompt", "tech_prompt", "default_prompt"]
