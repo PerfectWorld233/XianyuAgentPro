@@ -121,6 +121,7 @@ class BridgeManager:
         self.knowledge_task: asyncio.Task | None = None
         self.knowledge_manager: 'KnowledgeManager | None' = None
         self.knowledge_retriever: 'KnowledgeRetriever | None' = None
+        self._active_bot: 'XianyuReplyBot | None' = None
 
     def load_modules(self):
         """Import project modules (supports both source and PyInstaller bundle)."""
@@ -161,6 +162,7 @@ class BridgeManager:
             raise ValueError("API_KEY 未配置，请在设置页面填写 API Key")
 
         bot = XianyuReplyBot(config=config, prompt_overrides=prompt_overrides)
+        self._active_bot = bot
         context_manager = ChatContextManager(db_path=self.chat_db_path)
         live = XianyuLive(
             cookies_str=cookies_str,
@@ -324,27 +326,14 @@ class BridgeManager:
             elif action == "reload_config":
                 logger.info("收到 reload_config 指令，重新加载配置...")
                 was_running = start_task and not start_task.done()
-                # Stop first
-                if was_running:
-                    start_task.cancel()
-                    try:
-                        await asyncio.wait_for(asyncio.shield(start_task), timeout=6.0)
-                    except (asyncio.CancelledError, asyncio.TimeoutError):
-                        pass
-                await self.stop_bot()
-                start_task = None
-                # Cancel knowledge task if running
-                if self.knowledge_task and not self.knowledge_task.done():
-                    self.knowledge_task.cancel()
-                    try:
-                        await self.knowledge_task
-                    except asyncio.CancelledError:
-                        pass
-                    self.knowledge_task = None
-                # Reload config from DB, restart only if was running before
-                self.init_config()
-                if was_running:
-                    start_task = asyncio.create_task(self.start_bot())
+                if was_running and self._active_bot is not None:
+                    # Hot-reload prompts without restarting the bot
+                    prompt_overrides = self.config_manager.get_all_prompts()
+                    self._active_bot.reload_prompts(prompt_overrides)
+                    logger.info("提示词已热更新，机器人继续运行")
+                else:
+                    # Bot not running — just refresh config_manager so next start uses new values
+                    self.init_config()
 
             elif action == "generate_prompts":
                 chat_log = cmd.get("chat_log", "")
