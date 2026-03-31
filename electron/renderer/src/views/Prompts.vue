@@ -259,7 +259,7 @@ function discardPreview() {
 }
 
 .tab-dirty-dot {
-  color: #d20f39;
+  color: #f59e0b;
   font-size: 14px;
   font-weight: bold;
   margin-left: 2px;
@@ -267,8 +267,21 @@ function discardPreview() {
 }
 
 .tab-preview {
-  font-size: 12px;
+  background: transparent;
+  color: #7c3aed;
+  border: 1px solid #7c3aed;
+  font-size: 13px;
   font-weight: 500;
+}
+
+.tab-preview:hover {
+  background: #f5f3ff;
+}
+
+.tab-preview.active {
+  background: #7c3aed;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .editor-area {
