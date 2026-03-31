@@ -332,6 +332,14 @@ class BridgeManager:
                         pass
                 await self.stop_bot()
                 start_task = None
+                # Cancel knowledge task if running
+                if self.knowledge_task and not self.knowledge_task.done():
+                    self.knowledge_task.cancel()
+                    try:
+                        await self.knowledge_task
+                    except asyncio.CancelledError:
+                        pass
+                    self.knowledge_task = None
                 # Reload config from DB, restart only if was running before
                 self.init_config()
                 if was_running:
@@ -388,6 +396,9 @@ class BridgeManager:
         sys.stdout.flush()
 
     async def _handle_rebuild_index(self):
+        if self.knowledge_manager is None:
+            self._emit_knowledge_error("知识库未初始化")
+            return
         try:
             await self.knowledge_manager.rebuild_index()
             self.knowledge_retriever.invalidate_cache()
@@ -395,8 +406,12 @@ class BridgeManager:
             sys.stdout.flush()
         except Exception as e:
             logger.error(f"[knowledge] 索引重建失败: {e}")
+            self._emit_knowledge_error(str(e))
 
     async def _handle_generate_from_image(self, image_path: str):
+        if self.knowledge_manager is None:
+            self._emit_knowledge_error("知识库未初始化")
+            return
         try:
             result = await self.knowledge_manager.generate_from_image(image_path)
             payload = {"type": "knowledge_generate_result", "data": result}
@@ -407,6 +422,9 @@ class BridgeManager:
             self._emit_knowledge_error(str(e))
 
     async def _handle_generate_from_chat(self, chat_text: str):
+        if self.knowledge_manager is None:
+            self._emit_knowledge_error("知识库未初始化")
+            return
         try:
             result = await self.knowledge_manager.generate_from_chat_log(chat_text)
             payload = {"type": "knowledge_generate_result", "data": result}
