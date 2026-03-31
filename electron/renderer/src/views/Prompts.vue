@@ -100,8 +100,9 @@ onMounted(async () => {
     window.electronAPI.getPrompts(),
     window.electronAPI.getDefaultPrompts(),
   ])
-  form.value = prompts
   defaults.value = defaultPrompts
+  // 以默认值为底座，合并数据库中已保存的值，确保每个 key 始终有字符串值
+  form.value = { ...defaultPrompts, ...prompts }
   window.electronAPI.onGeneratePromptsResult((msg) => {
     generating.value = false
     if (msg.success) {
