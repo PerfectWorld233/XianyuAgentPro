@@ -25,6 +25,12 @@
             <span>提示词</span>
           </router-link>
         </li>
+        <li>
+          <router-link to="/knowledge" class="nav-item" active-class="active">
+            <span class="nav-icon">📚</span>
+            <span>知识库</span>
+          </router-link>
+        </li>
       </ul>
     </nav>
 
