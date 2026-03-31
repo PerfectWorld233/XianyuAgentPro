@@ -16,7 +16,7 @@ from context_manager import ChatContextManager
 
 
 class XianyuLive:
-    def __init__(self, cookies_str: str, config: dict, config_manager=None):
+    def __init__(self, cookies_str: str, config: dict, config_manager=None, knowledge_retriever=None):
         self.xianyu = XianyuApis(config_manager=config_manager)
         self.base_url = 'wss://wss-goofish.dingtalk.com/'
         self.cookies_str = cookies_str
@@ -24,6 +24,7 @@ class XianyuLive:
         self.xianyu.session.cookies.update(self.cookies)
         self.myid = self.cookies['unb']
         self.device_id = generate_device_id(self.myid)
+        self.config = config
 
         # 心跳相关配置
         self.heartbeat_interval = int(config.get("HEARTBEAT_INTERVAL", "15"))
@@ -55,6 +56,9 @@ class XianyuLive:
         # 模拟人工输入配置
         simulate_str = config.get("SIMULATE_HUMAN_TYPING", "False")
         self.simulate_human_typing = simulate_str.lower() == "true"
+
+        # 知识库检索器
+        self.knowledge_retriever = knowledge_retriever
 
     def set_context_manager(self, context_manager: ChatContextManager):
         self.context_manager = context_manager
@@ -450,10 +454,27 @@ class XianyuLive:
             item_description = f"当前商品的信息如下：{self.build_item_description(item_info)}"
 
             context = self.context_manager.get_context_by_chat(chat_id)
-            bot_reply = self.bot.generate_reply(
+
+            # 知识库检索
+            knowledge = []
+            if self.knowledge_retriever:
+                try:
+                    top_k = int(self.config.get("KNOWLEDGE_TOP_K", "3"))
+                    knowledge = await self.knowledge_retriever.search(
+                        send_message, item_id=item_id, top_k=top_k
+                    )
+                    if knowledge:
+                        logger.info(f"[RAG] 检索到 {len(knowledge)} 条相关知识")
+                except Exception as e:
+                    logger.warning(f"[RAG] 知识库检索失败，降级继续: {e}")
+                    knowledge = []
+
+            bot_reply = await asyncio.to_thread(
+                self.bot.generate_reply,
                 send_message,
                 item_description,
-                context=context
+                context,
+                knowledge,
             )
 
             if bot_reply == "-":

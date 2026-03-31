@@ -165,7 +165,8 @@ class BridgeManager:
         live = XianyuLive(
             cookies_str=cookies_str,
             config=config,
-            config_manager=self.config_manager
+            config_manager=self.config_manager,
+            knowledge_retriever=self.knowledge_retriever,
         )
         live.set_context_manager(context_manager)
         live.set_bot(bot)
