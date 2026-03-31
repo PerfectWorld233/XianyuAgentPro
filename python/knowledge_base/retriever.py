@@ -82,10 +82,16 @@ class KnowledgeRetriever:
         - 合并去重，按相似度排序
         降级：索引不存在或 KNOWLEDGE_ENABLED=False 时返回 []。
         """
-        if self.config.get("KNOWLEDGE_ENABLED", "True") != "True":
+        # Fix 5: case-insensitive check so "true", "TRUE", " True " all work
+        if self.config.get("KNOWLEDGE_ENABLED", "True").strip().lower() != "true":
             return []
 
         if not self._load_index():
+            return []
+
+        # Fix 4: guard against _item_positions being None (e.g. _load_index returned
+        # True from the already-loaded branch but a previous load failed mid-way)
+        if self._item_positions is None:
             return []
 
         model = self.config.get("EMBEDDING_MODEL", "text-embedding-v3")

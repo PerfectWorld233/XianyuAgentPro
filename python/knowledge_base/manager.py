@@ -1,8 +1,8 @@
 # python/knowledge_base/manager.py
-import asyncio
 import base64
 import json
 import os
+import re
 import sqlite3
 from typing import List, Dict, Optional
 
@@ -10,6 +10,8 @@ import numpy as np
 import faiss
 from loguru import logger
 from openai import AsyncOpenAI
+
+EMBED_BATCH_SIZE = 25
 
 
 class KnowledgeManager:
@@ -75,15 +77,22 @@ class KnowledgeManager:
         if need_embed:
             logger.info(f"[KnowledgeManager] 为 {len(need_embed)} 条条目生成 embedding...")
             texts = [r["question"] for r in need_embed]
-            vectors = await self._embed(texts)
+            # Fix 3: chunk API calls to stay within the 25-text limit per request
+            all_vectors = []
+            for i in range(0, len(texts), EMBED_BATCH_SIZE):
+                batch = texts[i:i + EMBED_BATCH_SIZE]
+                batch_vecs = await self._embed(batch)
+                all_vectors.append(batch_vecs)
+            vectors = np.vstack(all_vectors)
+            # Fix 2: wrap writes in a transaction
             conn = sqlite3.connect(self.db_path)
             try:
-                for row, vec in zip(need_embed, vectors):
-                    conn.execute(
-                        "UPDATE knowledge SET embedding = ?, updated_at = datetime('now') WHERE id = ?",
-                        (vec.tobytes(), row["id"])
-                    )
-                conn.commit()
+                with conn:
+                    for row, vec in zip(need_embed, vectors):
+                        conn.execute(
+                            "UPDATE knowledge SET embedding = ?, updated_at = datetime('now') WHERE id = ?",
+                            (vec.tobytes(), row["id"])
+                        )
             finally:
                 conn.close()
             # 重新读取（含刚写入的 embedding）
@@ -96,13 +105,17 @@ class KnowledgeManager:
             finally:
                 conn.close()
 
-        # 构建 FAISS 索引
+        # Fix 1: normalize vectors loaded from SQLite before adding to FAISS
+        # np.frombuffer returns a read-only array, so .copy() is required before division
         all_vecs = []
         id_map = []
         for r in rows:
             if r["embedding"] is None:
                 continue
-            vec = np.frombuffer(r["embedding"], dtype=np.float32)
+            vec = np.frombuffer(r["embedding"], dtype=np.float32).copy()
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec = vec / norm
             all_vecs.append(vec)
             id_map.append(r["id"])
 
@@ -162,10 +175,11 @@ class KnowledgeManager:
             temperature=0.3,
         )
         content = response.choices[0].message.content.strip()
-        # 容错：去掉可能的 markdown 代码块
+        # Fix 7: use regex for robust markdown code fence stripping
         if content.startswith("```"):
-            content = "\n".join(content.split("\n")[1:])
-            content = content.rstrip("`").strip()
+            content = re.sub(r'^```[^\n]*\n?', '', content)
+            content = re.sub(r'\n?```$', '', content)
+            content = content.strip()
         return json.loads(content)
 
     async def generate_from_chat_log(self, chat_text: str) -> List[Dict[str, str]]:
@@ -189,7 +203,9 @@ class KnowledgeManager:
             temperature=0.3,
         )
         content = response.choices[0].message.content.strip()
+        # Fix 7: use regex for robust markdown code fence stripping
         if content.startswith("```"):
-            content = "\n".join(content.split("\n")[1:])
-            content = content.rstrip("`").strip()
+            content = re.sub(r'^```[^\n]*\n?', '', content)
+            content = re.sub(r'\n?```$', '', content)
+            content = content.strip()
         return json.loads(content)
