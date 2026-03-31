@@ -77,6 +77,33 @@
           </div>
         </div>
       </div>
+
+      <!-- AI Preview Tab content -->
+      <div v-show="activeTab === '__preview__'" class="preview-area">
+        <div v-for="tab in tabs" :key="tab.key" class="preview-panel">
+          <div class="preview-panel-header">
+            <span class="preview-panel-title">{{ tab.label }}</span>
+            <button class="btn btn-primary btn-sm" @click="applyPreview(tab.key)">应用此项</button>
+          </div>
+          <div class="preview-panel-body">
+            <textarea
+              class="preview-readonly"
+              readonly
+              :value="form[tab.key]"
+              spellcheck="false"
+            />
+            <textarea
+              class="preview-editable prompt-editor"
+              v-model="previewPrompts[tab.key]"
+              spellcheck="false"
+            />
+          </div>
+        </div>
+        <div class="preview-actions">
+          <button class="btn btn-primary" @click="applyAllPreviews">全部应用</button>
+          <button class="btn btn-secondary" @click="discardPreview">放弃</button>
+        </div>
+      </div>
     </div>
 
     <div v-else class="loading">加载中...</div>
