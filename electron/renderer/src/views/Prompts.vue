@@ -2,6 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">提示词编辑</h1>
+      <button class="btn btn-reset-all" @click="resetAllPrompts">恢复所有默认</button>
     </div>
 
     <!-- AI 生成面板 -->
@@ -56,7 +57,8 @@
 
       <!-- Editor -->
       <div class="editor-area">
-        <div v-for="tab in tabs" :key="tab.key" v-show="activeTab === tab.key" class="editor-pane">
+        <template v-for="tab in tabs" :key="tab.key">
+          <div v-if="activeTab === tab.key" class="editor-pane">
           <div class="editor-toolbar">
             <span class="char-count">{{ (form[tab.key] || '').length }} 字符</span>
             <button type="button" class="btn btn-text" @click="resetPrompt(tab.key)">
@@ -70,12 +72,18 @@
             spellcheck="false"
           />
           <div class="form-actions">
-            <button class="btn btn-primary" :disabled="savingKey === tab.key" @click="save(tab.key)">
+            <button
+              class="btn btn-primary"
+              :class="{ 'btn-primary--dirty': dirtyKeys.includes(tab.key) }"
+              :disabled="savingKey === tab.key || !dirtyKeys.includes(tab.key)"
+              @click="save(tab.key)"
+            >
               {{ savingKey === tab.key ? '保存中...' : `保存${tab.label}` }}
             </button>
             <span v-if="savedKey === tab.key" class="save-ok">✓ 已保存</span>
           </div>
         </div>
+        </template>
       </div>
 
       <!-- AI Preview Tab content -->
@@ -176,24 +184,21 @@ onMounted(async () => {
 })
 
 onBeforeRouteLeave(() => {
-  if (dirtyKeys.value.length > 0) {
-    return confirm('有未保存的提示词修改，确定要离开吗？')
-  }
+  // confirm() does not work in Electron renderer — dirty state is shown via tab dot indicators
 })
 
 function switchTab(key) {
-  // only check dirty when leaving a regular editing tab (not the preview tab)
-  if (activeTab.value !== '__preview__' && dirtyKeys.value.includes(activeTab.value)) {
-    const label = tabs.find(t => t.key === activeTab.value)?.label ?? activeTab.value
-    if (!confirm(`「${label}」有未保存的修改，确定要切换吗？`)) return
-  }
   activeTab.value = key
 }
 
 function resetPrompt(key) {
-  if (confirm(`确定要恢复 "${tabs.find(t => t.key === key)?.label}" 提示词为当前默认内容吗？`)) {
-    form.value[key] = defaults.value[key] || ''
-  }
+  form.value[key] = defaults.value[key] || ''
+}
+
+async function resetAllPrompts() {
+  tabs.forEach(t => { form.value[t.key] = defaults.value[t.key] || '' })
+  await window.electronAPI.savePrompts({ ...form.value })
+  savedState.value = { ...form.value }
 }
 
 async function generatePrompts() {
@@ -245,7 +250,24 @@ function discardPreview() {
 }
 
 .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.btn-reset-all {
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.btn-reset-all:hover {
+  color: #475569;
+  border-color: #cbd5e1;
 }
 
 .page-title {
@@ -385,6 +407,15 @@ function discardPreview() {
 
 .btn-primary:not(:disabled):hover {
   background: #3a8eef;
+}
+
+.btn-primary--dirty {
+  opacity: 1;
+}
+
+.btn-primary:disabled:not(.btn-ai) {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .save-ok {
