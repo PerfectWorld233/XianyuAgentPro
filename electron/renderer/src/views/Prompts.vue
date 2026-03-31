@@ -41,7 +41,16 @@
           :class="{ active: activeTab === tab.key }"
           @click="switchTab(tab.key)"
         >
-          {{ tab.label }}
+          {{ tab.label }}<span v-if="dirtyKeys.includes(tab.key)" class="tab-dirty-dot"> ●</span>
+        </button>
+        <!-- preview tab: only shown when AI results are pending -->
+        <button
+          v-if="previewPrompts !== null"
+          class="tab tab-preview"
+          :class="{ active: activeTab === '__preview__' }"
+          @click="switchTab('__preview__')"
+        >
+          ✨ AI 预览
         </button>
       </div>
 
@@ -247,6 +256,19 @@ function discardPreview() {
   color: #1e2030;
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.tab-dirty-dot {
+  color: #d20f39;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 2px;
+  vertical-align: baseline;
+}
+
+.tab-preview {
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .editor-area {
