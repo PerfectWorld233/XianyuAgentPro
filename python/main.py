@@ -456,10 +456,14 @@ class XianyuLive:
             context = self.context_manager.get_context_by_chat(chat_id)
 
             # 知识库检索
-            knowledge = []
+            knowledge = None
             if self.knowledge_retriever:
                 try:
-                    top_k = int(self.config.get("KNOWLEDGE_TOP_K", "3"))
+                    try:
+                        top_k = int(self.config.get("KNOWLEDGE_TOP_K", "3"))
+                    except (ValueError, TypeError):
+                        logger.warning("[RAG] KNOWLEDGE_TOP_K 配置无效，使用默认值 3")
+                        top_k = 3
                     knowledge = await self.knowledge_retriever.search(
                         send_message, item_id=item_id, top_k=top_k
                     )
@@ -467,7 +471,7 @@ class XianyuLive:
                         logger.info(f"[RAG] 检索到 {len(knowledge)} 条相关知识")
                 except Exception as e:
                     logger.warning(f"[RAG] 知识库检索失败，降级继续: {e}")
-                    knowledge = []
+                    knowledge = None
 
             bot_reply = await asyncio.to_thread(
                 self.bot.generate_reply,
