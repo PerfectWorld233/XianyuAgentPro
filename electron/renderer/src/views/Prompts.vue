@@ -79,7 +79,7 @@
       </div>
 
       <!-- AI Preview Tab content -->
-      <div v-show="activeTab === '__preview__'" class="preview-area">
+      <div v-if="activeTab === '__preview__' && previewPrompts !== null" class="preview-area">
         <div v-for="tab in tabs" :key="tab.key" class="preview-panel">
           <div class="preview-panel-header">
             <span class="preview-panel-title">{{ tab.label }}</span>
