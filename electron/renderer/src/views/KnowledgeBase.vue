@@ -162,21 +162,25 @@ function closeModal() {
 
 async function saveEntry() {
   const itemId = formItemId.value.trim() || undefined
-  if (editingEntry.value) {
-    await window.electronAPI.updateKnowledge({
-      id: editingEntry.value.id,
-      question: formQuestion.value,
-      answer: formAnswer.value,
-    })
-  } else {
-    await window.electronAPI.addKnowledge({
-      question: formQuestion.value,
-      answer: formAnswer.value,
-      itemId,
-    })
+  try {
+    if (editingEntry.value) {
+      await window.electronAPI.updateKnowledge({
+        id: editingEntry.value.id,
+        question: formQuestion.value,
+        answer: formAnswer.value,
+      })
+    } else {
+      await window.electronAPI.addKnowledge({
+        question: formQuestion.value,
+        answer: formAnswer.value,
+        itemId,
+      })
+    }
+    closeModal()
+    await loadEntries()
+  } catch (e) {
+    alert(`保存失败：${e.message}`)
   }
-  closeModal()
-  await loadEntries()
 }
 
 async function deleteEntry(id) {
@@ -186,16 +190,24 @@ async function deleteEntry(id) {
 }
 
 async function triggerGenerateFromImage() {
-  const result = await window.electronAPI.generateFromImage()
-  if (result?.canceled) return
-  isGenerating.value = true
+  try {
+    const result = await window.electronAPI.generateFromImage()
+    if (result?.canceled) return
+    isGenerating.value = true
+  } catch (e) {
+    alert(`打开文件对话框失败：${e.message}`)
+  }
 }
 
 async function generateFromChat() {
   if (!chatText.value.trim()) return
-  await window.electronAPI.generateFromChat({ chatText: chatText.value })
-  isGenerating.value = true
-  showChatPanel.value = false
+  try {
+    await window.electronAPI.generateFromChat({ chatText: chatText.value })
+    isGenerating.value = true
+    showChatPanel.value = false
+  } catch (e) {
+    alert(`发送聊天记录失败：${e.message}`)
+  }
 }
 
 async function confirmBatchAdd() {
@@ -254,6 +266,7 @@ onUnmounted(() => {
 .btn-primary { padding: 8px 16px; background: #1677ff; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .btn-primary:disabled { background: #a0c4ff; cursor: not-allowed; }
 .btn-secondary { padding: 8px 16px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm { padding: 4px 10px; font-size: 12px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; margin-right: 4px; }
 .btn-danger { color: #ff4d4f; }
 </style>
