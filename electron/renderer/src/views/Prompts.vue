@@ -508,4 +508,57 @@ function discardPreview() {
   border-radius: 6px;
   padding: 10px;
 }
+
+/* --- preview area layout --- */
+.preview-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.preview-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e2030;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.btn-secondary {
+  background: #e2e8f0;
+  color: #475569;
+  padding: 9px 24px;
+  font-weight: 500;
+}
+
+.btn-secondary:hover {
+  background: #cbd5e1;
+}
+
+.btn-sm {
+  padding: 5px 14px;
+  font-size: 12px;
+}
 </style>
