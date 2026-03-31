@@ -1,5 +1,5 @@
 appId: com.xianyu.autoagent
-productName: XianyuAutoAgent
+productName: XianyuAgentPro
 copyright: Copyright © 2024
 
 directories:
@@ -24,7 +24,6 @@ win:
     - target: dir
       arch:
         - x64
-  icon: assets/icon.ico
 
 nsis:
   oneClick: false
