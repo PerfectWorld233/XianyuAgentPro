@@ -502,11 +502,12 @@ function discardPreview() {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.6;
-  background: #f8fafc;
-  color: #475569;
+  background: #f5f5f5;
+  color: #888;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: default;
 }
 
 /* --- preview area layout --- */
