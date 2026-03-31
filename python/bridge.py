@@ -118,6 +118,9 @@ class BridgeManager:
         self.config_manager = None
         self.bot_task: asyncio.Task = None
         self.generate_task: asyncio.Task = None
+        self.knowledge_task: asyncio.Task | None = None
+        self.knowledge_manager: 'KnowledgeManager | None' = None
+        self.knowledge_retriever: 'KnowledgeRetriever | None' = None
 
     def load_modules(self):
         """Import project modules (supports both source and PyInstaller bundle)."""
@@ -132,6 +135,13 @@ class BridgeManager:
         self.config_manager = AppConfigManager(self.config_db_path)
         self.config_manager.seed_defaults(prompt_dir)
         logger.info("配置管理器初始化完成")
+
+        from knowledge_base import KnowledgeManager, KnowledgeRetriever
+        config = self.config_manager.get_config()
+        # 必须先注入 DB_PATH，KnowledgeManager/KnowledgeRetriever 构造函数会直接访问 config["DB_PATH"]
+        config["DB_PATH"] = self.config_manager.db_path
+        self.knowledge_manager = KnowledgeManager(config)
+        self.knowledge_retriever = KnowledgeRetriever(config)
 
     def build_live_instance(self):
         """Instantiate XianyuLive and XianyuReplyBot from current DB config."""
@@ -338,8 +348,73 @@ class BridgeManager:
                 else:
                     logger.warning("AI 生成已在进行中，忽略重复请求")
 
+            elif action == "knowledge:rebuild_index":
+                if not self.knowledge_task or self.knowledge_task.done():
+                    self.knowledge_task = asyncio.create_task(
+                        self._handle_rebuild_index()
+                    )
+                else:
+                    logger.debug("[knowledge] 索引重建已在进行中，忽略重复请求")
+
+            elif action == "knowledge:generate_from_image":
+                image_path = cmd.get("image_path", "")
+                if not image_path:
+                    self._emit_knowledge_error("image_path 不能为空")
+                elif not self.knowledge_task or self.knowledge_task.done():
+                    self.knowledge_task = asyncio.create_task(
+                        self._handle_generate_from_image(image_path)
+                    )
+                else:
+                    self._emit_knowledge_error("AI 生成已在进行中，请稍后再试")
+
+            elif action == "knowledge:generate_from_chat":
+                chat_text = cmd.get("chat_text", "")
+                if not chat_text.strip():
+                    self._emit_knowledge_error("聊天记录不能为空")
+                elif not self.knowledge_task or self.knowledge_task.done():
+                    self.knowledge_task = asyncio.create_task(
+                        self._handle_generate_from_chat(chat_text)
+                    )
+                else:
+                    self._emit_knowledge_error("AI 生成已在进行中，请稍后再试")
+
             else:
                 logger.warning(f"未知命令: {action}")
+
+
+    def _emit_knowledge_error(self, message: str):
+        payload = {"type": "knowledge_generate_error", "message": message}
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        sys.stdout.flush()
+
+    async def _handle_rebuild_index(self):
+        try:
+            await self.knowledge_manager.rebuild_index()
+            self.knowledge_retriever.invalidate_cache()
+            sys.stdout.write(json.dumps({"type": "knowledge_rebuild_result", "success": True}) + "\n")
+            sys.stdout.flush()
+        except Exception as e:
+            logger.error(f"[knowledge] 索引重建失败: {e}")
+
+    async def _handle_generate_from_image(self, image_path: str):
+        try:
+            result = await self.knowledge_manager.generate_from_image(image_path)
+            payload = {"type": "knowledge_generate_result", "data": result}
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+        except Exception as e:
+            logger.error(f"[knowledge] 图片生成 Q&A 失败: {e}")
+            self._emit_knowledge_error(str(e))
+
+    async def _handle_generate_from_chat(self, chat_text: str):
+        try:
+            result = await self.knowledge_manager.generate_from_chat_log(chat_text)
+            payload = {"type": "knowledge_generate_result", "data": result}
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+        except Exception as e:
+            logger.error(f"[knowledge] 聊天记录生成 Q&A 失败: {e}")
+            self._emit_knowledge_error(str(e))
 
 
 # ---------------------------------------------------------------------------
