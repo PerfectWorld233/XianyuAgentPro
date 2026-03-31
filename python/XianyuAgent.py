@@ -46,9 +46,13 @@ class XianyuReplyBot:
         user_assistant_msgs = [msg for msg in context if msg['role'] in ['user', 'assistant']]
         return "\n".join([f"{msg['role']}: {msg['content']}" for msg in user_assistant_msgs])
 
-    def generate_reply(self, user_msg: str, item_desc: str, context: List[Dict]) -> str:
+    def generate_reply(self, user_msg: str, item_desc: str, context: List[Dict], knowledge: List[Dict] = None) -> str:
         """生成回复主流程"""
         formatted_context = self.format_history(context)
+
+        if knowledge:
+            kb_lines = "\n".join([f"Q: {k['question']}\nA: {k['answer']}" for k in knowledge])
+            formatted_context = f"【相关知识库】\n{kb_lines}\n\n【对话历史】\n{formatted_context}"
 
         detected_intent = self.router.detect(user_msg, item_desc, formatted_context)
 
