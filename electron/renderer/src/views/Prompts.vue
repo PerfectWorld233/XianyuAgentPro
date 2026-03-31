@@ -86,17 +86,23 @@
             <button class="btn btn-primary btn-sm" @click="applyPreview(tab.key)">应用此项</button>
           </div>
           <div class="preview-panel-body">
-            <textarea
-              class="preview-readonly"
-              readonly
-              :value="form[tab.key]"
-              spellcheck="false"
-            />
-            <textarea
-              class="preview-editable prompt-editor"
-              v-model="previewPrompts[tab.key]"
-              spellcheck="false"
-            />
+            <div class="preview-col">
+              <div class="preview-col-label">当前内容（只读）</div>
+              <textarea
+                class="preview-readonly"
+                readonly
+                :value="form[tab.key]"
+                spellcheck="false"
+              />
+            </div>
+            <div class="preview-col">
+              <div class="preview-col-label">AI 生成内容（可编辑）</div>
+              <textarea
+                class="preview-editable prompt-editor"
+                v-model="previewPrompts[tab.key]"
+                spellcheck="false"
+              />
+            </div>
           </div>
         </div>
         <div class="preview-actions">
@@ -469,5 +475,37 @@ function discardPreview() {
 .generate-err {
   font-size: 12px;
   color: #d20f39;
+}
+
+.preview-panel-body {
+  display: flex;
+  gap: 12px;
+  height: 400px;
+}
+
+.preview-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preview-col-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.preview-readonly {
+  flex: 1;
+  resize: none;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
 }
 </style>
