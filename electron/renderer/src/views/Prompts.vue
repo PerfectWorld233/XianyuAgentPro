@@ -182,11 +182,13 @@ function applyAllPreviews() {
   if (!previewPrompts.value) return
   tabs.forEach(t => { form.value[t.key] = previewPrompts.value[t.key] })
   previewPrompts.value = null
+  generateError.value = ''
   activeTab.value = 'classify_prompt'
 }
 
 function discardPreview() {
   previewPrompts.value = null
+  generateError.value = ''
   activeTab.value = 'classify_prompt'
 }
 </script>
