@@ -18,7 +18,9 @@
 | 🖥️ 桌面 GUI | Electron + Vue 3 可视化界面，无需命令行 |
 | 🔐 扫码登录 | 内置 Chromium，扫码后自动写入 Cookie，免手动复制 |
 | ⚙️ 可视化配置 | 设置页直接修改 API Key、模型、Cookie 等，重启即生效 |
-| ✏️ Prompt 编辑器 | 界面内直接修改各专家 Agent 的系统提示词 |
+| ✏️ Prompt 编辑器 | 界面内直接修改各专家 Agent 的系统提示词，保存后立即热更新 |
+| 🧠 AI 生成提示词 | 粘贴聊天记录，AI 自动分析卖家风格生成四套提示词 |
+| 📚 知识库 | 自定义商品 Q&A，支持图片/聊天记录 AI 生成，向量检索增强回复质量 |
 | 🔄 手动/自动模式 | 关键词触发手动接管，超时后自动恢复 AI 值守 |
 | 📋 实时日志 | 控制台页面实时展示运行日志，方便排查问题 |
 
@@ -153,8 +155,17 @@ npm run build:electron
 │   ├── XianyuApis.py       # 闲鱼平台 HTTP API 封装
 │   ├── context_manager.py  # 会话上下文管理（SQLite）
 │   ├── config_manager.py   # 配置与提示词管理（SQLite）
+│   ├── login_browser.py    # CDP 扫码登录模块
+│   ├── knowledge_base/     # 知识库模块（向量检索）
+│   │   ├── manager.py      # 知识条目管理与索引构建
+│   │   └── retriever.py    # 向量检索
 │   └── utils/
 │       └── xianyu_utils.py # 工具函数（Cookie、签名、加解密）
+├── data/                   # 默认提示词模板
+│   ├── classify_prompt_example.txt
+│   ├── price_prompt_example.txt
+│   ├── tech_prompt_example.txt
+│   └── default_prompt_example.txt
 ├── scripts/                # 构建脚本
 ├── installer/              # Inno Setup 安装包配置
 └── images/                 # 截图资源
@@ -186,7 +197,10 @@ npm run build:electron
 查看控制台日志，确认消息通过了过滤器，并检查意图分类结果与所选 Agent。
 
 **Q：LLM 回复质量不佳？**
-前往「Prompt」页面修改各专家 Agent 的系统提示词，无需重启即可生效。
+前往「提示词」页面修改各专家 Agent 的系统提示词，保存后立即热更新无需重启。也可粘贴历史聊天记录，点击「AI 生成」自动生成匹配卖家风格的提示词。
+
+**Q：如何提升特定商品的回复准确度？**
+前往「知识库」页面添加该商品的常见问题与答案，支持手动录入、图片 AI 识别和聊天记录 AI 提取三种方式。
 
 **Q：WebSocket 频繁断开？**
 属于正常的 Token 刷新重连，日志中出现「Token刷新成功」表示连接已恢复。
