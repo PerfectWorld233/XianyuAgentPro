@@ -116,9 +116,16 @@ onMounted(async () => {
   window.electronAPI.onGeneratePromptsResult((msg) => {
     generating.value = false
     if (msg.success) {
-      Object.assign(form.value, msg.prompts)
+      const p = msg.prompts || {}
+      // validate each key; fall back to current form value if missing
+      previewPrompts.value = {
+        classify_prompt: typeof p.classify_prompt === 'string' ? p.classify_prompt : form.value.classify_prompt,
+        price_prompt:    typeof p.price_prompt    === 'string' ? p.price_prompt    : form.value.price_prompt,
+        tech_prompt:     typeof p.tech_prompt     === 'string' ? p.tech_prompt     : form.value.tech_prompt,
+        default_prompt:  typeof p.default_prompt  === 'string' ? p.default_prompt  : form.value.default_prompt,
+      }
       showAiPanel.value = false
-      activeTab.value = 'classify_prompt'
+      activeTab.value = '__preview__'
     } else {
       generateError.value = msg.message || '生成失败，请重试'
     }
@@ -164,6 +171,23 @@ async function save(key) {
   } finally {
     savingKey.value = ''
   }
+}
+
+function applyPreview(key) {
+  form.value[key] = previewPrompts.value[key]
+  // dirtyKeys recomputes automatically (form[key] !== savedState[key])
+}
+
+function applyAllPreviews() {
+  if (!previewPrompts.value) return
+  tabs.forEach(t => { form.value[t.key] = previewPrompts.value[t.key] })
+  previewPrompts.value = null
+  activeTab.value = 'classify_prompt'
+}
+
+function discardPreview() {
+  previewPrompts.value = null
+  activeTab.value = 'classify_prompt'
 }
 </script>
 
