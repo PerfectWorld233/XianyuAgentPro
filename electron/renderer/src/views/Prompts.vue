@@ -75,7 +75,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 
 const tabs = [
   { key: 'classify_prompt', label: '意图分类' },
@@ -95,6 +96,14 @@ const generating = ref(false)
 const generateError = ref('')
 const showAiPanel = ref(false)
 
+const savedState = ref({})   // snapshot of form at last save / initial load
+const previewPrompts = ref(null)  // null | { classify_prompt, price_prompt, tech_prompt, default_prompt }
+
+// dirtyKeys: which of the 4 regular tabs have unsaved edits
+const dirtyKeys = computed(() =>
+  tabs.filter(t => form.value[t.key] !== savedState.value[t.key]).map(t => t.key)
+)
+
 onMounted(async () => {
   const [prompts, defaultPrompts] = await Promise.all([
     window.electronAPI.getPrompts(),
@@ -103,6 +112,7 @@ onMounted(async () => {
   defaults.value = defaultPrompts
   // 以默认值为底座，合并数据库中已保存的值，确保每个 key 始终有字符串值
   form.value = { ...defaultPrompts, ...prompts }
+  savedState.value = { ...form.value }  // snapshot — must be before AI listener
   window.electronAPI.onGeneratePromptsResult((msg) => {
     generating.value = false
     if (msg.success) {
@@ -114,6 +124,12 @@ onMounted(async () => {
     }
   })
   loaded.value = true
+})
+
+onBeforeRouteLeave(() => {
+  if (dirtyKeys.value.length > 0) {
+    return confirm('有未保存的提示词修改，确定要离开吗？')
+  }
 })
 
 function resetPrompt(key) {
