@@ -39,7 +39,7 @@
           :key="tab.key"
           class="tab"
           :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
+          @click="switchTab(tab.key)"
         >
           {{ tab.label }}
         </button>
@@ -132,6 +132,15 @@ onBeforeRouteLeave(() => {
   }
 })
 
+function switchTab(key) {
+  // only check dirty when leaving a regular editing tab (not the preview tab)
+  if (activeTab.value !== '__preview__' && dirtyKeys.value.includes(activeTab.value)) {
+    const label = tabs.find(t => t.key === activeTab.value)?.label ?? activeTab.value
+    if (!confirm(`「${label}」有未保存的修改，确定要切换吗？`)) return
+  }
+  activeTab.value = key
+}
+
 function resetPrompt(key) {
   if (confirm(`确定要恢复 "${tabs.find(t => t.key === key)?.label}" 提示词为当前默认内容吗？`)) {
     form.value[key] = defaults.value[key] || ''
@@ -150,6 +159,7 @@ async function save(key) {
   try {
     await window.electronAPI.savePrompts({ [key]: form.value[key] })
     savedKey.value = key
+    savedState.value[key] = form.value[key]  // clear dirty for this key
     setTimeout(() => { savedKey.value = '' }, 3000)
   } finally {
     savingKey.value = ''
